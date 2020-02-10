@@ -1,6 +1,5 @@
 package com.tencent.angel.graph
 
-import com.tencent.angel.graph.data.UnTypedNode
 import com.tencent.angel.graph.utils.SerDe
 import io.netty.buffer.{ByteBuf, Unpooled}
 import it.unimi.dsi.fastutil.ints._
@@ -13,7 +12,51 @@ import scala.util.Random
 class SerDeTest extends AnyFunSuite {
   val directBuf: ByteBuf = Unpooled.buffer(2048)
 
-  test("array") {
+  test("primitive") {
+    val bo = true
+    val by = "b".getBytes.head
+    val c = "c".toCharArray.head
+    val s = 123.toShort
+    val i = 123
+    val l = 123L
+    val f = 12.3f
+    val d = 12.3
+    val str = "hello world!"
+
+    SerDe.serPrimitive(bo, directBuf)
+    SerDe.serPrimitive(by, directBuf)
+    SerDe.serPrimitive(c, directBuf)
+    SerDe.serPrimitive(s, directBuf)
+    SerDe.serPrimitive(i, directBuf)
+    SerDe.serPrimitive(l, directBuf)
+    SerDe.serPrimitive(f, directBuf)
+    SerDe.serPrimitive(d, directBuf)
+    SerDe.serPrimitive(str, directBuf)
+
+    println(SerDe.primitiveFromBuffer[Boolean](directBuf))
+    println(SerDe.primitiveFromBuffer[Byte](directBuf))
+    println(SerDe.primitiveFromBuffer[Char](directBuf))
+    println(SerDe.primitiveFromBuffer[Short](directBuf))
+    println(SerDe.primitiveFromBuffer[Int](directBuf))
+    println(SerDe.primitiveFromBuffer[Long](directBuf))
+    println(SerDe.primitiveFromBuffer[Float](directBuf))
+    println(SerDe.primitiveFromBuffer[Double](directBuf))
+    println(SerDe.primitiveFromBuffer[String](directBuf))
+
+    println(SerDe.serPrimitiveBufSize(bo))
+    println(SerDe.serPrimitiveBufSize(by))
+    println(SerDe.serPrimitiveBufSize(c))
+    println(SerDe.serPrimitiveBufSize(s))
+    println(SerDe.serPrimitiveBufSize(i))
+    println(SerDe.serPrimitiveBufSize(l))
+    println(SerDe.serPrimitiveBufSize(f))
+    println(SerDe.serPrimitiveBufSize(d))
+    println(SerDe.serPrimitiveBufSize(str))
+
+    println("OK")
+  }
+
+  test("primitive array") {
     val abo = Array[Boolean](true, false)
     val aby = "abc".getBytes
     val ac = "bcd".toCharArray
@@ -23,7 +66,6 @@ class SerDeTest extends AnyFunSuite {
     val af = Array[Float](1.0f, 2.2f, 3.4f)
     val ad = Array[Double](1.2, 2.5, 3.4)
     val astr = Array[String]("abx", "drf")
-    val aser = Array[UnTypedNode](new UnTypedNode, new UnTypedNode)
 
     SerDe.serArr(abo, directBuf)
     SerDe.serArr(aby, directBuf)
@@ -34,18 +76,16 @@ class SerDeTest extends AnyFunSuite {
     SerDe.serArr(af, directBuf)
     SerDe.serArr(ad, directBuf)
     SerDe.serArr(astr, directBuf)
-    SerDe.serArr(aser, directBuf)
 
-    val abo_ = SerDe.arrFromBuffer[Boolean](directBuf)
-    val aby_ = SerDe.arrFromBuffer[Byte](directBuf)
-    val ac_ = SerDe.arrFromBuffer[Char](directBuf)
-    val as_ = SerDe.arrFromBuffer[Short](directBuf)
-    val ai_ = SerDe.arrFromBuffer[Int](directBuf)
-    val al_ = SerDe.arrFromBuffer[Long](directBuf)
-    val af_ = SerDe.arrFromBuffer[Float](directBuf)
-    val ad_ = SerDe.arrFromBuffer[Double](directBuf)
-    val astr_ = SerDe.arrFromBuffer[String](directBuf)
-    val aser_ = SerDe.arrFromBuffer[UnTypedNode](directBuf)
+    println(SerDe.arrFromBuffer[Boolean](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Byte](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Char](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Short](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Int](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Long](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Float](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[Double](directBuf).mkString("{", ",", "}"))
+    println(SerDe.arrFromBuffer[String](directBuf).mkString("{", ",", "}"))
 
     println("OK")
   }
@@ -57,7 +97,6 @@ class SerDeTest extends AnyFunSuite {
     val i2f = new Int2FloatOpenHashMap(10)
     val i2d = new Int2DoubleOpenHashMap(10)
     val i2o = new Int2ObjectOpenHashMap[Array[Long]](10)
-    val i2g = new Int2ObjectOpenHashMap[UnTypedNode](10)
 
     val rand = new Random()
     (0 until rand.nextInt(10)).foreach { _ =>
@@ -67,7 +106,6 @@ class SerDeTest extends AnyFunSuite {
       i2f.put(key, rand.nextFloat())
       i2d.put(key, rand.nextDouble())
       i2o.put(key, Array.tabulate[Long](5)(_ => rand.nextLong()))
-      i2g.put(key, new UnTypedNode())
     }
 
     val l2i = new Long2IntOpenHashMap(10)
@@ -75,7 +113,6 @@ class SerDeTest extends AnyFunSuite {
     val l2f = new Long2FloatOpenHashMap(10)
     val l2d = new Long2DoubleOpenHashMap(10)
     val l2o = new Long2ObjectOpenHashMap[Array[Double]](10)
-    val l2g = new Long2ObjectOpenHashMap[UnTypedNode](10)
 
     (0 until rand.nextInt(10)).foreach { _ =>
       val key = rand.nextLong()
@@ -84,7 +121,6 @@ class SerDeTest extends AnyFunSuite {
       l2f.put(key, rand.nextFloat())
       l2d.put(key, rand.nextDouble())
       l2o.put(key, Array.tabulate[Double](5)(_ => rand.nextLong()))
-      l2g.put(key, new UnTypedNode())
     }
 
     // 2. deserialize
@@ -94,13 +130,11 @@ class SerDeTest extends AnyFunSuite {
     SerDe.serFastMap(i2f, directBuf)
     SerDe.serFastMap(i2d, directBuf)
     SerDe.serFastMap(i2o, directBuf)
-    SerDe.serFastMap(i2g, directBuf)
     SerDe.serFastMap(l2i, directBuf)
     SerDe.serFastMap(l2l, directBuf)
     SerDe.serFastMap(l2f, directBuf)
     SerDe.serFastMap(l2d, directBuf)
     SerDe.serFastMap(l2o, directBuf)
-    SerDe.serFastMap(l2g, directBuf)
 
     // 3. serialize
     println("fastMapFromBuffer")
@@ -109,15 +143,17 @@ class SerDeTest extends AnyFunSuite {
     val i2f_ = SerDe.fastMapFromBuffer[Int2FloatOpenHashMap](directBuf)
     val i2d_ = SerDe.fastMapFromBuffer[Int2DoubleOpenHashMap](directBuf)
     val i2o_ = SerDe.fastMapFromBuffer[Int2ObjectOpenHashMap[Array[Long]]](directBuf)
-    val i2g_ = SerDe.fastMapFromBuffer[Int2ObjectOpenHashMap[UnTypedNode]](directBuf)
     val l2i_ = SerDe.fastMapFromBuffer[Long2IntOpenHashMap](directBuf)
     val l2l_ = SerDe.fastMapFromBuffer[Long2LongOpenHashMap](directBuf)
     val l2f_ = SerDe.fastMapFromBuffer[Long2FloatOpenHashMap](directBuf)
     val l2d_ = SerDe.fastMapFromBuffer[Long2DoubleOpenHashMap](directBuf)
     val l2o_ = SerDe.fastMapFromBuffer[Long2ObjectOpenHashMap[Array[Double]]](directBuf)
-    val l2g_ = SerDe.fastMapFromBuffer[Long2ObjectOpenHashMap[UnTypedNode]](directBuf)
 
     println("OK!")
+  }
+
+  test("vector") {
+
   }
 
 }
