@@ -2,10 +2,7 @@ package com.tencent.angel.graph.utils
 
 import java.util
 
-import it.unimi.dsi.fastutil.ints._
-import it.unimi.dsi.fastutil.longs._
-import com.tencent.angel.ml.math2.vector.Vector
-
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.tools.reflect.ToolBox
@@ -111,6 +108,10 @@ object ReflectUtils {
 
   def getType[T: TypeTag](obj: T): Type = typeOf[T]
 
+  def getTypeFromObject(obj: Any): Type = {
+    instMirror(obj).symbol.typeSignature
+  }
+
   def getType(typeStr: String): Type = typeCache.synchronized {
     if (typeCache.containsKey(typeStr)) {
       typeCache.get(typeStr)
@@ -122,51 +123,22 @@ object ReflectUtils {
     }
   }
 
-  def isPrimitive(tpe: Type): Boolean = tpe match {
-    case t if t =:= typeOf[Boolean] => true
-    case t if t =:= typeOf[Char] => true
-    case t if t =:= typeOf[Byte] => true
-    case t if t =:= typeOf[Short] => true
-    case t if t =:= typeOf[Int] => true
-    case t if t =:= typeOf[Long] => true
-    case t if t =:= typeOf[Float] => true
-    case t if t =:= typeOf[Double] => true
-    case t if t =:= typeOf[String] => true
-    case _ => false
+  def getFields(tpe: Type): List[TermSymbol] = {
+    val buf = new ListBuffer[TermSymbol]()
+    tpe.members.foreach {
+      case field: TermSymbol if !field.isMethod && (field.isVal || field.isVal) =>
+        val annotations = field.annotations
+        if (annotations.isEmpty) {
+          buf.append(field)
+        } else {
+          val trans = annotations.forall { ann => !ann.toString.equalsIgnoreCase("transient") }
+          if (trans) {
+            buf.append(field)
+          }
+        }
+      case _ =>
+    }
+
+    buf.toList
   }
-
-  def isPrimitiveArray(tpe: Type): Boolean = tpe match {
-    case t if t.weak_<:<(typeOf[Array[_]]) && isPrimitive(tpe.typeArgs.head) => true
-    case _ => false
-  }
-
-  def isIntKeyFastMap(tpe: Type): Boolean = tpe match {
-    case t if t =:= typeOf[Int2BooleanOpenHashMap] => true
-    case t if t =:= typeOf[Int2CharOpenHashMap] => true
-    case t if t =:= typeOf[Int2ByteOpenHashMap] => true
-    case t if t =:= typeOf[Int2ShortOpenHashMap] => true
-    case t if t =:= typeOf[Int2IntOpenHashMap] => true
-    case t if t =:= typeOf[Int2LongOpenHashMap] => true
-    case t if t =:= typeOf[Int2FloatOpenHashMap] => true
-    case t if t =:= typeOf[Int2DoubleOpenHashMap] => true
-    case t if t.weak_<:<(typeOf[Int2ObjectOpenHashMap[_]]) => true
-    case _ => false
-  }
-
-  def isLongKeyFastMap(tpe: Type): Boolean = tpe match {
-    case t if t =:= typeOf[Long2BooleanOpenHashMap] => true
-    case t if t =:= typeOf[Long2CharOpenHashMap] => true
-    case t if t =:= typeOf[Long2ByteOpenHashMap] => true
-    case t if t =:= typeOf[Long2ShortOpenHashMap] => true
-    case t if t =:= typeOf[Long2IntOpenHashMap] => true
-    case t if t =:= typeOf[Long2LongOpenHashMap] => true
-    case t if t =:= typeOf[Long2FloatOpenHashMap] => true
-    case t if t =:= typeOf[Long2DoubleOpenHashMap] => true
-    case t if t.weak_<:<(typeOf[Long2ObjectOpenHashMap[_]]) => true
-    case _ => false
-  }
-
-  def isFastMap(tpe: Type): Boolean = isIntKeyFastMap(tpe) || isLongKeyFastMap(tpe)
-
-  def isVector(tpe: Type): Boolean = tpe.weak_<:<(typeOf[Vector])
 }

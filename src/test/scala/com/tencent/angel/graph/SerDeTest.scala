@@ -1,6 +1,7 @@
 package com.tencent.angel.graph
 
-import com.tencent.angel.graph.utils.SerDe
+import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
+import com.tencent.angel.ml.math2.VFactory
 import io.netty.buffer.{ByteBuf, Unpooled}
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
@@ -153,7 +154,49 @@ class SerDeTest extends AnyFunSuite {
   }
 
   test("vector") {
+    val idu = VFactory.intDummyVector(10, Array(1, 3, 5, 7))
 
+    val dsi = VFactory.denseIntVector(Array(1, 3, 5, 7, 9, 10))
+    val sti = VFactory.sortedIntVector(10, Array(1, 3, 5, 7, 9), Array(2, 4, 6, 8, 10))
+    val spi = VFactory.sparseIntVector(100, Array(1, 30, 50, 71, 89, 99), Array(2, 40, 65, 89, 190, 666))
+
+    val dsl = VFactory.denseLongVector(Array(1L, 3L, 5L, 7L, 9L, 10L))
+    val stl = VFactory.sortedLongVector(10, Array(1, 3, 5, 7, 9), Array(2L, 4L, 6L, 8L, 10L))
+    val spl = VFactory.sparseLongVector(100, Array(1, 30, 50, 71, 89, 99), Array(2L, 40L, 65L, 89L, 190L, 666L))
+
+    val dsf = VFactory.denseFloatVector(Array(1.5f, 3.6f, 5.8f, 7.9f, 9.2f, 10.6f))
+    val stf = VFactory.sortedFloatVector(10, Array(1, 3, 5, 7, 9), Array(2.5f, 4.8f, 6.4f, 8.8f, 10.9f))
+    val spf = VFactory.sparseFloatVector(100, Array(1, 30, 50, 71, 89, 99), Array(2.6f, 40.8f, 65.4f, 89.0f, 190.3f, 666.8f))
+
+    val dsd = VFactory.denseDoubleVector(Array(1.5, 3.9, 5.7, 7.4, 9.7, 10.9))
+    val std = VFactory.sortedDoubleVector(10, Array(1, 3, 5, 7, 9), Array(2.4, 4.1, 6.7, 8.6, 10.3))
+    val spd = VFactory.sparseDoubleVector(100, Array(1, 30, 50, 71, 89, 99), Array(2.3, 40.5, 65.4, 89.2, 190.4, 666.6))
+
+    val lidu = VFactory.longDummyVector(10, Array(1L, 3L, 5L, 7L))
+
+    val lsti = VFactory.sortedLongKeyIntVector(10L, Array(1L, 3L, 5L, 7L, 9L), Array(2, 4, 6, 8, 10))
+    val lspi = VFactory.sparseLongKeyIntVector(100L, Array(1L, 30L, 50L, 71L, 89L, 99L), Array(2, 40, 65, 89, 190, 666))
+
+    val lstl = VFactory.sortedLongKeyLongVector(10L, Array(1L, 3L, 5L, 7L, 9L), Array(2L, 4L, 6L, 8L, 10L))
+    val lspl = VFactory.sparseLongKeyLongVector(100L, Array(1L, 30L, 50L, 71L, 89L, 99L), Array(2L, 40L, 65L, 89L, 190L, 666L))
+
+    val lstf = VFactory.sortedLongKeyFloatVector(10L, Array(1L, 3L, 5L, 7L, 9L), Array(2.5f, 4.8f, 6.4f, 8.8f, 10.9f))
+    val lspf = VFactory.sparseLongKeyFloatVector(100L, Array(1L, 30L, 50L, 71L, 89L, 99L), Array(2.6f, 40.8f, 65.4f, 89.0f, 190.3f, 666.8f))
+
+    val lstd = VFactory.sortedLongKeyDoubleVector(10L, Array(1L, 3L, 5L, 7L, 9L), Array(2.4, 4.1, 6.7, 8.6, 10.3))
+    val lspd = VFactory.sparseLongKeyDoubleVector(100L, Array(1L, 30L, 50L, 71L, 89L, 99L), Array(2.3, 40.5, 65.4, 89.2, 190.4, 666.6))
+
+    val allVectors = Array(idu, dsi, sti, spi, dsl, stl, spl, dsf, stf, spf, dsd, std, spd,
+      lidu,  lsti, lspi, lstl, lspl, lstf, lspf, lstd, lspd)
+
+    allVectors.foreach{ vec => SerDe.serVector(vec, directBuf)}
+
+    allVectors.foreach{ vec =>
+      val tpe = ReflectUtils.getType(vec)
+      val desered = SerDe.vectorFromBuffer(tpe, directBuf)
+    }
+
+    print("OK")
   }
 
 }

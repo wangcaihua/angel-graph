@@ -21,76 +21,15 @@ sealed trait ANode extends IElement {
   def hasNeighbor(args: Int*): Boolean
 
   override def serialize(byteBuf: ByteBuf): Unit = {
-    val inst = ReflectUtils.instMirror(this)
-
-    ANode.getFields(this).foreach { field =>
-      field.typeSignature match {
-        case tpe if ReflectUtils.isPrimitive(tpe) =>
-          SerDe.serPrimitive(ReflectUtils.field(inst, field).get, byteBuf)
-        case tpe if tpe.weak_<:<(ru.typeOf[ANode]) =>
-          ReflectUtils.field(inst, field).get.asInstanceOf[ANode].serialize(byteBuf)
-        case tpe if ReflectUtils.isPrimitiveArray(tpe) =>
-          SerDe.serArr(tpe.typeArgs.head, ReflectUtils.field(inst, field).get, byteBuf)
-        case tpe if ReflectUtils.isFastMap(tpe) =>
-          SerDe.serFastMap(ReflectUtils.field(inst, field).get, byteBuf)
-        case tpe if ReflectUtils.isVector(tpe) =>
-          SerDe.serVector(ReflectUtils.field(inst, field).get.asInstanceOf[Vector], byteBuf)
-        case tpe =>
-          throw new Exception(s"cannot serialize field ${tpe.toString}")
-      }
-    }
+    SerDe.serialize(this, ANode.getFields(this), byteBuf)
   }
 
   override def deserialize(byteBuf: ByteBuf): Unit = {
-    val inst = ReflectUtils.instMirror(this)
-
-    ANode.getFields(this).foreach { field =>
-      field.typeSignature match {
-        case tpe if ReflectUtils.isPrimitive(tpe) =>
-          ReflectUtils.field(inst, field)
-            .set(field, SerDe.primitiveFromBuffer(tpe, byteBuf))
-        case tpe if tpe.weak_<:<(ru.typeOf[ANode]) =>
-          val node = ReflectUtils.newInstance(tpe).asInstanceOf[ANode]
-          node.deserialize(byteBuf)
-          ReflectUtils.field(inst, field)
-            .set(field, node)
-        case tpe if ReflectUtils.isPrimitiveArray(tpe) =>
-          ReflectUtils.field(inst, field)
-            .set(field, SerDe.arrFromBuffer(tpe.typeArgs.head, byteBuf))
-        case tpe if ReflectUtils.isFastMap(tpe) =>
-          ReflectUtils.field(inst, field)
-            .set(field, SerDe.fastMapFromBuffer(tpe, byteBuf))
-        case tpe if ReflectUtils.isVector(tpe) =>
-          ReflectUtils.field(inst, field)
-            .set(field, SerDe.vectorFromBuffer(tpe, byteBuf))
-        case tpe =>
-          throw new Exception(s"cannot serialize field ${tpe.toString}")
-      }
-    }
+    SerDe.serialize(this, ANode.getFields(this), byteBuf)
   }
 
   override def bufferLen(): Int = {
-    val inst = ReflectUtils.instMirror(this)
-    var len = 0
-
-    ANode.getFields(this).foreach { field =>
-      field.typeSignature match {
-        case tpe if ReflectUtils.isPrimitive(tpe) =>
-          len += SerDe.serPrimitiveBufSize(ReflectUtils.field(inst, field).get)
-        case tpe if tpe.weak_<:<(ru.typeOf[ANode]) =>
-          len += ReflectUtils.field(inst, field).get.asInstanceOf[ANode].bufferLen()
-        case tpe if ReflectUtils.isPrimitiveArray(tpe) =>
-          len += SerDe.serArrBufSize(tpe.typeArgs.head, ReflectUtils.field(inst, field).get)
-        case tpe if ReflectUtils.isFastMap(tpe) =>
-          len += SerDe.serFastMapBufSize(ReflectUtils.field(inst, field).get)
-        case tpe if ReflectUtils.isVector(tpe) =>
-          len += SerDe.serVectorBufSize(ReflectUtils.field(inst, field).get.asInstanceOf[Vector])
-        case tpe =>
-          throw new Exception(s"cannot serialize field ${tpe.toString}")
-      }
-    }
-
-    len
+    SerDe.bufferLen(this, ANode.getFields(this))
   }
 
   override def serialize(dataOutputStream: DataOutputStream): Unit = ???
@@ -162,23 +101,8 @@ object ANode {
     clazz.knownDirectSubclasses.foreach {
       case clz: ru.ClassSymbol =>
         val cType = clz.toType
-        val buf = new ListBuffer[ru.TermSymbol]()
-        cType.members.foreach {
-          case field: ru.TermSymbol if !field.isMethod && (field.isVal || field.isVal) =>
-            val annotations = field.annotations
-            if (annotations.isEmpty) {
-              buf.append(field)
-            } else {
-              val trans = annotations.forall { ann => !ann.toString.equalsIgnoreCase("transient") }
-              if (trans) {
-                buf.append(field)
-              }
-            }
-          case _ =>
-        }
-
         types.put(clz.fullName, cType)
-        fields.put(clz.fullName, buf.toList)
+        fields.put(clz.fullName, ReflectUtils.getFields(cType))
       case _ =>
     }
   }

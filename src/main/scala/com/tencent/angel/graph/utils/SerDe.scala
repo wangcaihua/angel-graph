@@ -146,6 +146,43 @@ object SerDe {
     }
   }
 
+  def serArr[T: TypeTag](arr: Array[T], start: Int, end: Int, byteBuf: ByteBuf): Unit = {
+    serArr(typeOf[T], arr, start, end, byteBuf)
+  }
+
+  def serArr(typ: Type, arr: Any, start: Int, end: Int, byteBuf: ByteBuf): Unit = {
+    if (arr == null || end - start <= 1) {
+      byteBuf.writeInt(0)
+    } else {
+      byteBuf.writeInt(end - start)
+      typ match {
+        case bool if bool =:= typeOf[Boolean] =>
+          arr.asInstanceOf[Array[Boolean]].foreach(e => byteBuf.writeBoolean(e))
+        case byte if byte =:= typeOf[Byte] =>
+          arr.asInstanceOf[Array[Byte]].foreach(e => byteBuf.writeByte(e))
+        case char if char =:= typeOf[Char] =>
+          arr.asInstanceOf[Array[Char]].foreach(e => byteBuf.writeChar(e))
+        case short if short =:= typeOf[Short] =>
+          arr.asInstanceOf[Array[Short]].foreach(e => byteBuf.writeShort(e))
+        case int if int =:= typeOf[Int] =>
+          arr.asInstanceOf[Array[Int]].foreach(e => byteBuf.writeInt(e))
+        case long if long =:= typeOf[Long] =>
+          arr.asInstanceOf[Array[Long]].foreach(e => byteBuf.writeLong(e))
+        case float if float =:= typeOf[Float] =>
+          arr.asInstanceOf[Array[Float]].foreach(e => byteBuf.writeFloat(e))
+        case double if double =:= typeOf[Double] =>
+          arr.asInstanceOf[Array[Double]].foreach(e => byteBuf.writeDouble(e))
+        case str if str =:= typeOf[String] =>
+          arr.asInstanceOf[Array[String]].foreach { e =>
+            byteBuf.writeInt(e.length)
+            byteBuf.writeBytes(e.getBytes)
+          }
+        case t =>
+          throw new Exception(s"type ${t.toString} cannot serialize")
+      }
+    }
+  }
+
   def arrFromBuffer[T: TypeTag](byteBuf: ByteBuf): Array[T] = {
     arrFromBuffer(typeOf[T], byteBuf).asInstanceOf[Array[T]]
   }
@@ -223,6 +260,43 @@ object SerDe {
           case t =>
             throw new Exception(s"type ${t.toString} cannot serialize")
         }
+      }
+    }
+
+    len
+  }
+
+  def serArrBufSize[T: TypeTag](arr: Array[T], start: Int, end: Int): Int = {
+    serArrBufSize(typeOf[T], arr, start, end)
+  }
+
+  def serArrBufSize(typ: Type, arr: Any, start: Int, end: Int): Int = {
+    var len = 4
+    val length = end - start
+    if (arr != null && end - start <= 1) {
+      typ match {
+        case bool if bool =:= typeOf[Boolean] =>
+          len += length * boolSize
+        case byte if byte =:= typeOf[Byte] =>
+          len += length
+        case char if char =:= typeOf[Char] =>
+          len += length * charSize
+        case short if short =:= typeOf[Short] =>
+          len += length * shortSize
+        case int if int =:= typeOf[Int] =>
+          len += length * 4
+        case long if long =:= typeOf[Long] =>
+          len += length * 8
+        case float if float =:= typeOf[Float] =>
+          len += length * 4
+        case double if double =:= typeOf[Double] =>
+          len += length * 8
+        case str if str =:= typeOf[String] =>
+          arr.asInstanceOf[Array[String]].foreach { e =>
+            len += e.getBytes.length + 4
+          }
+        case t =>
+          throw new Exception(s"type ${t.toString} cannot serialize")
       }
     }
 
@@ -940,6 +1014,23 @@ object SerDe {
           res.put(key, new String(dst))
         }
         res
+      case tp if tp.weak_<:<(typeOf[Int2ObjectOpenHashMap[_]]) && tp.typeArgs.head.weak_<:<(typeOf[Serialize]) =>
+        val etype = tp.typeArgs.head
+        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+
+        if (etype.weak_<:<(typeOf[Serialize])) {
+          val put = ReflectUtils.method(outer, "put", typeOf[Int])
+          (0 until size).foreach { _ =>
+            val key = byteBuf.readInt()
+            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
+            inner.deserialize(byteBuf)
+            put(key, inner)
+          }
+        } else {
+          throw new Exception(s"${etype.toString} cannot serialize!")
+        }
+
+        outer
       case tp if tp =:= typeOf[Int2ObjectOpenHashMap[Array[Boolean]]] =>
         val res = new Int2ObjectOpenHashMap[Array[Boolean]](size)
 
@@ -996,23 +1087,6 @@ object SerDe {
           res.put(byteBuf.readInt(), arrFromBuffer[Double](byteBuf))
         }
         res
-      case tp if tp.weak_<:<(typeOf[Int2ObjectOpenHashMap[_]]) =>
-        val etype = tp.typeArgs.head
-        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
-
-        if (etype.weak_<:<(typeOf[Serialize])) {
-          val put = ReflectUtils.method(outer, "put", typeOf[Int])
-          (0 until size).foreach { _ =>
-            val key = byteBuf.readInt()
-            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
-            inner.deserialize(byteBuf)
-            put(key, inner)
-          }
-        } else {
-          throw new Exception(s"${etype.toString} cannot serialize!")
-        }
-
-        outer
       case tp if tp == typeOf[Long2BooleanOpenHashMap] =>
         val res = new Long2BooleanOpenHashMap(size)
         (0 until size).foreach { _ =>
@@ -1087,6 +1161,23 @@ object SerDe {
           res.put(key, new String(dst))
         }
         res
+      case tp if tp.weak_<:<(typeOf[Long2ObjectOpenHashMap[_]]) && tp.typeArgs.head.weak_<:<(typeOf[Serialize]) =>
+        val etype = tp.typeArgs.head
+        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+
+        if (etype.weak_<:<(typeOf[Serialize])) {
+          val put = ReflectUtils.method(outer, "put", typeOf[Long])
+          (0 until size).foreach { _ =>
+            val key = byteBuf.readLong()
+            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
+            inner.deserialize(byteBuf)
+            put(key, inner)
+          }
+        } else {
+          throw new Exception(s"${etype.toString} cannot serialize!")
+        }
+
+        outer
       case tp if tp =:= typeOf[Long2ObjectOpenHashMap[Array[Boolean]]] =>
         val res = new Long2ObjectOpenHashMap[Array[Boolean]](size)
 
@@ -1143,23 +1234,6 @@ object SerDe {
           res.put(byteBuf.readLong(), arrFromBuffer[Double](byteBuf))
         }
         res
-      case tp if tp.weak_<:<(typeOf[Long2ObjectOpenHashMap[_]]) =>
-        val etype = tp.typeArgs.head
-        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
-
-        if (etype.weak_<:<(typeOf[Serialize])) {
-          val put = ReflectUtils.method(outer, "put", typeOf[Long])
-          (0 until size).foreach { _ =>
-            val key = byteBuf.readLong()
-            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
-            inner.deserialize(byteBuf)
-            put(key, inner)
-          }
-        } else {
-          throw new Exception(s"${etype.toString} cannot serialize!")
-        }
-
-        outer
       case tp =>
         throw new Exception(s"type ${tp.toString} cannot deserialize")
     }
@@ -1278,7 +1352,7 @@ object SerDe {
   }
 
   def vectorFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
-    assert (tpe <:< typeOf[Vector])
+    assert(tpe <:< typeOf[Vector])
     val dim = byteBuf.readLong()
 
     byteBuf.readInt() match {
@@ -1472,5 +1546,119 @@ object SerDe {
     }
 
     len + 12
+  }
+
+  // 4. for object
+  def serialize(obj: Any, fields: List[TermSymbol], byteBuf: ByteBuf): Unit = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+
+    fields.foreach { field =>
+      field.typeSignature match {
+        case tpe if GUtils.isPrimitive(tpe) =>
+          SerDe.serPrimitive(ReflectUtils.field(inst, field).get, byteBuf)
+        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+          ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].serialize(byteBuf)
+        case tpe if GUtils.isPrimitiveArray(tpe) =>
+          SerDe.serArr(tpe.typeArgs.head, ReflectUtils.field(inst, field).get, byteBuf)
+        case tpe if GUtils.isFastMap(tpe) =>
+          SerDe.serFastMap(ReflectUtils.field(inst, field).get, byteBuf)
+        case tpe if GUtils.isVector(tpe) =>
+          SerDe.serVector(ReflectUtils.field(inst, field).get.asInstanceOf[Vector], byteBuf)
+        case tpe =>
+          throw new Exception(s"cannot serialize field ${tpe.toString}")
+      }
+    }
+  }
+
+  def serialize(obj: Any, byteBuf: ByteBuf): Unit = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+    val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
+
+    serialize(inst, fields, byteBuf)
+  }
+
+  def deserialize(obj: Any, fields: List[TermSymbol], byteBuf: ByteBuf): Unit = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+
+    fields.foreach { field =>
+      field.typeSignature match {
+        case tpe if GUtils.isPrimitive(tpe) =>
+          ReflectUtils.field(inst, field)
+            .set(field, SerDe.primitiveFromBuffer(tpe, byteBuf))
+        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+          val node = ReflectUtils.newInstance(tpe).asInstanceOf[Serialize]
+          node.deserialize(byteBuf)
+          ReflectUtils.field(inst, field)
+            .set(field, node)
+        case tpe if GUtils.isPrimitiveArray(tpe) =>
+          ReflectUtils.field(inst, field)
+            .set(field, SerDe.arrFromBuffer(tpe.typeArgs.head, byteBuf))
+        case tpe if GUtils.isFastMap(tpe) =>
+          ReflectUtils.field(inst, field)
+            .set(field, SerDe.fastMapFromBuffer(tpe, byteBuf))
+        case tpe if GUtils.isVector(tpe) =>
+          ReflectUtils.field(inst, field)
+            .set(field, SerDe.vectorFromBuffer(tpe, byteBuf))
+        case tpe =>
+          throw new Exception(s"cannot serialize field ${tpe.toString}")
+      }
+    }
+  }
+
+  def deserialize(obj: Any, byteBuf: ByteBuf): Unit = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+    val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
+
+    deserialize(inst, fields, byteBuf)
+  }
+
+  def bufferLen(obj: Any, fields: List[TermSymbol]): Int = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+
+    var len = 0
+
+    fields.foreach { field =>
+      field.typeSignature match {
+        case tpe if GUtils.isPrimitive(tpe) =>
+          len += SerDe.serPrimitiveBufSize(ReflectUtils.field(inst, field).get)
+        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+          len += ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].bufferLen()
+        case tpe if GUtils.isPrimitiveArray(tpe) =>
+          len += SerDe.serArrBufSize(tpe.typeArgs.head, ReflectUtils.field(inst, field).get)
+        case tpe if GUtils.isFastMap(tpe) =>
+          len += SerDe.serFastMapBufSize(ReflectUtils.field(inst, field).get)
+        case tpe if GUtils.isVector(tpe) =>
+          len += SerDe.serVectorBufSize(ReflectUtils.field(inst, field).get.asInstanceOf[Vector])
+        case tpe =>
+          throw new Exception(s"cannot serialize field ${tpe.toString}")
+      }
+    }
+
+    len
+  }
+
+  def bufferLen(obj: Any):Int = {
+    val inst = obj match {
+      case instMirror: InstanceMirror => instMirror
+      case _ => ReflectUtils.instMirror(obj)
+    }
+    val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
+
+    bufferLen(inst, fields)
   }
 }
