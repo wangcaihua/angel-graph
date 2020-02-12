@@ -1593,21 +1593,20 @@ object SerDe {
       field.typeSignature match {
         case tpe if GUtils.isPrimitive(tpe) =>
           ReflectUtils.field(inst, field)
-            .set(field, SerDe.primitiveFromBuffer(tpe, byteBuf))
+            .set(SerDe.primitiveFromBuffer(tpe, byteBuf))
         case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
           val node = ReflectUtils.newInstance(tpe).asInstanceOf[Serialize]
           node.deserialize(byteBuf)
-          ReflectUtils.field(inst, field)
-            .set(field, node)
+          ReflectUtils.field(inst, field).set(node)
         case tpe if GUtils.isPrimitiveArray(tpe) =>
           ReflectUtils.field(inst, field)
-            .set(field, SerDe.arrFromBuffer(tpe.typeArgs.head, byteBuf))
+            .set(SerDe.arrFromBuffer(tpe.typeArgs.head, byteBuf))
         case tpe if GUtils.isFastMap(tpe) =>
           ReflectUtils.field(inst, field)
-            .set(field, SerDe.fastMapFromBuffer(tpe, byteBuf))
+            .set(SerDe.fastMapFromBuffer(tpe, byteBuf))
         case tpe if GUtils.isVector(tpe) =>
           ReflectUtils.field(inst, field)
-            .set(field, SerDe.vectorFromBuffer(tpe, byteBuf))
+            .set(SerDe.vectorFromBuffer(tpe, byteBuf))
         case tpe =>
           throw new Exception(s"cannot serialize field ${tpe.toString}")
       }

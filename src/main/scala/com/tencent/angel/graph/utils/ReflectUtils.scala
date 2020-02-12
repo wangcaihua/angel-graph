@@ -106,7 +106,9 @@ object ReflectUtils {
 
   def getClassTag[T: ClassTag](obj: T): ClassTag[T] = implicitly[ClassTag[T]]
 
-  def getType[T: TypeTag](obj: T): Type = typeOf[T]
+  def getType(obj: Any): Type = {
+    mirror.reflect(obj).symbol.typeSignature
+  }
 
   def getTypeFromObject(obj: Any): Type = {
     instMirror(obj).symbol.typeSignature
