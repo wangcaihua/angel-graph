@@ -1,6 +1,5 @@
 package com.tencent.angel.graph.core.sampler
 
-
 import com.tencent.angel.graph.{VertexId, WgtTpe}
 import it.unimi.dsi.fastutil.ints.{IntArrayList, IntStack}
 

@@ -1,19 +1,21 @@
-package com.tencent.angel.graph.core.psf
+package com.tencent.angel.graph.algo.utils
 
 import com.tencent.angel.graph.core.psf.get._
 import com.tencent.angel.graph.core.psf.update.{GUpdateFunc, GUpdateParam, UpdateOp}
 import com.tencent.angel.ps.PSContext
 import com.tencent.angel.ps.storage.vector.ServerRow
 import com.tencent.angel.spark.models.PSMatrix
+import org.apache.spark.compat.CUtils
 
-import scala.reflect.runtime.universe._
 import scala.language.implicitConversions
+import scala.reflect.runtime.universe._
 
 class Get(psMatrix: PSMatrix) {
   def get[T: TypeTag, U](getParam: T, mergeParam: U)
-                        (getFunc: (PSContext, Int, Int, ServerRow, Type, Any) => (Type,Any))
+                        (getFunc: (PSContext, Int, Int, ServerRow, Type, Any) => (Type, Any))
                         (mergeFunc: (Type, Any, Any) => Any): U = {
-    val getFuncId = GetOp(getFunc)
+    val cleanedGetFunc = CUtils.clean(getFunc)
+    val getFuncId = GetOp(cleanedGetFunc)
     val mergeFuncId = MergeOp(mergeFunc)
     MergeOp.setInit(mergeFuncId, mergeParam)
 
@@ -33,7 +35,8 @@ class Get(psMatrix: PSMatrix) {
             (getFunc: (PSContext, Int, Int, ServerRow, Type, Any) => (Type, Any))
             (mergeFunc: (Type, Any, Any) => Any): U = {
 
-    val getFuncId = GetOp(getFunc)
+    val cleanedGetFunc = CUtils.clean(getFunc)
+    val getFuncId = GetOp(cleanedGetFunc)
     val mergeFuncId = MergeOp(mergeFunc)
     MergeOp.setInit(mergeFuncId, mergeParam)
 
@@ -53,7 +56,8 @@ class Get(psMatrix: PSMatrix) {
 class Update(psMatrix: PSMatrix) {
   def update[T: TypeTag](updateParam: T)
                         (updateFunc: (PSContext, Int, Int, ServerRow, Type, Any) => Unit): Unit = {
-    val updateFuncId = UpdateOp(updateFunc)
+    val cleanedUpdateFunc = CUtils.clean(updateFunc)
+    val updateFuncId = UpdateOp(cleanedUpdateFunc)
 
     val param = GUpdateParam[T](psMatrix.id, updateParam, updateFuncId)
     val func = new GUpdateFunc(param)
@@ -63,7 +67,8 @@ class Update(psMatrix: PSMatrix) {
   }
 
   def update(updateFunc: (PSContext, Int, Int, ServerRow, Type, Any) => Unit): Unit = {
-    val updateFuncId = UpdateOp(updateFunc)
+    val cleanedUpdateFunc = CUtils.clean(updateFunc)
+    val updateFuncId = UpdateOp(cleanedUpdateFunc)
 
     val param = GUpdateParam.empty(psMatrix.id, updateFuncId)
     val func = new GUpdateFunc(param)
