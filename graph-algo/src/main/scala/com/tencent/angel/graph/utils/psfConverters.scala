@@ -1,4 +1,4 @@
-package com.tencent.angel.graph.algo.utils
+package com.tencent.angel.graph.utils
 
 import com.tencent.angel.graph.core.psf.get._
 import com.tencent.angel.graph.core.psf.update.{GUpdateFunc, GUpdateParam, UpdateOp}
