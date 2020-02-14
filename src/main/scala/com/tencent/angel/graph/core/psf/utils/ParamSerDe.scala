@@ -13,18 +13,10 @@ object ParamSerDe {
     SerDe.serPrimitive(tpe.toString, buf)
 
     splitter match {
-      case split: RangeSplitter[Int] =>
+      case split: RangeSplitter =>
         if (GUtils.isPrimitiveArray(tpe)) {
           SerDe.serArr(split.arr, split.start, split.end, buf)
-        } else if (GUtils.isIntKeyFastMap(tpe)) {
-          SerDe.serFastMap(params, split.arr, split.start, split.end, buf)
-        } else {
-          throw new Exception("type error!")
-        }
-      case split: RangeSplitter[Long] =>
-        if (GUtils.isPrimitiveArray(tpe)) {
-          SerDe.serArr(split.arr, split.start, split.end, buf)
-        } else if (GUtils.isLongKeyFastMap(tpe)) {
+        } else if (GUtils.isFastMap(tpe)) {
           SerDe.serFastMap(params, split.arr, split.start, split.end, buf)
         } else {
           throw new Exception("type error!")
@@ -35,13 +27,18 @@ object ParamSerDe {
         } else if (tpe <:< typeOf[Serialize]) {
           params.asInstanceOf[Serialize].serialize(buf)
         } else {
-          throw new Exception("type error!")
+          try {
+            SerDe.serialize(params, buf)
+          } catch {
+            case e: Exception => throw e
+          }
         }
     }
   }
 
   def deserializeSplit(buf: ByteBuf): (Type, Any) = {
     val tpe = ReflectUtils.getType(SerDe.primitiveFromBuffer[String](buf))
+
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)
     } else if (GUtils.isPrimitiveArray(tpe)) {
@@ -52,6 +49,14 @@ object ParamSerDe {
       val tmp = ReflectUtils.newInstance(tpe)
       tmp.asInstanceOf[Serialize].deserialize(buf)
       tmp
+    } else {
+      try {
+        val tmp = ReflectUtils.newInstance(tpe)
+        SerDe.deserialize(tmp, buf)
+        tmp
+      } catch {
+        case e: Exception => throw e
+      }
     }
 
     (tpe, params)
@@ -63,18 +68,10 @@ object ParamSerDe {
     len += SerDe.serPrimitiveBufSize(tpe.toString)
 
     splitter match {
-      case split: RangeSplitter[Int] =>
+      case split: RangeSplitter =>
         if (GUtils.isPrimitiveArray(tpe)) {
           len += SerDe.serArrBufSize(split.arr, split.start, split.end)
-        } else if (GUtils.isIntKeyFastMap(tpe)) {
-          len += SerDe.serFastMapBufSize(params, split.arr, split.start, split.end)
-        } else {
-          throw new Exception("type error!")
-        }
-      case split: RangeSplitter[Long] =>
-        if (GUtils.isPrimitiveArray(tpe)) {
-          len += SerDe.serArrBufSize(split.arr, split.start, split.end)
-        } else if (GUtils.isLongKeyFastMap(tpe)) {
+        } else if (GUtils.isFastMap(tpe)) {
           len += SerDe.serFastMapBufSize(params, split.arr, split.start, split.end)
         } else {
           throw new Exception("type error!")
@@ -85,7 +82,11 @@ object ParamSerDe {
         } else if (tpe <:< typeOf[Serialize]) {
           len += params.asInstanceOf[Serialize].bufferLen()
         } else {
-          throw new Exception("type error!")
+          try {
+            len += SerDe.bufferLen(params)
+          } catch {
+            case e: Exception => throw e
+          }
         }
     }
 

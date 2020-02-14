@@ -7,11 +7,11 @@ import com.tencent.angel.ml.math2.vector._
 
 import scala.reflect.runtime.universe._
 
-case class GGetResult(var tpe: Type, var value: Any) extends GetResult
+case class GGetResult(value: Any) extends GetResult
 
-class GPartitionGetResult(var tpe: Type, var pResult: Any) extends PartitionGetResult {
+class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int) extends PartitionGetResult {
 
-  def this() = this(null.asInstanceOf[Type], null.asInstanceOf[Any])
+  def this() = this(null.asInstanceOf[Type], null.asInstanceOf[Any], -1)
 
   override def serialize(byteBuf: ByteBuf): Unit = {
     SerDe.serPrimitive(tpe.toString, byteBuf)
@@ -23,6 +23,8 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any) extends PartitionGetR
       case t if GUtils.isVector(tpe) => SerDe.serVector(pResult.asInstanceOf[Vector], byteBuf)
       case _ => SerDe.serialize(pResult, ReflectUtils.getFields(tpe), byteBuf)
     }
+
+    byteBuf.writeInt(mergeFuncId)
   }
 
   override def bufferLen(): Int = {
@@ -36,7 +38,7 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any) extends PartitionGetR
       case _ => SerDe.bufferLen(pResult, ReflectUtils.getFields(tpe))
     }
 
-    tpeLen + dataLen
+    tpeLen + dataLen + 4
   }
 
   override def deserialize(byteBuf: ByteBuf): Unit = {
@@ -55,5 +57,7 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any) extends PartitionGetR
         pResult = ReflectUtils.newInstance(t)
         SerDe.deserialize(pResult, ReflectUtils.getFields(tpe), byteBuf)
     }
+
+    mergeFuncId = byteBuf.readInt()
   }
 }

@@ -11,7 +11,7 @@ import com.tencent.angel.ps.storage.vector.element.IElement
 import io.netty.buffer.ByteBuf
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 
-import scala.reflect.runtime.{universe => ru}
+import scala.reflect.runtime.universe._
 
 sealed trait ANode extends IElement {
 
@@ -240,15 +240,15 @@ class NodeTNWA(val tpe: Int, val neighs: Int2ObjectOpenHashMap[Array[VertexId]],
 }
 
 object ANode {
-  private val fields = new scala.collection.mutable.HashMap[String, List[ru.TermSymbol]]()
-  private val types = new scala.collection.mutable.HashMap[String, ru.Type]()
+  private val fields = new scala.collection.mutable.HashMap[String, List[TermSymbol]]()
+  private val types = new scala.collection.mutable.HashMap[String, Type]()
   private val isInited = new AtomicBoolean(false)
 
   private def init(): Unit = {
-    val tpe = ru.typeOf[ANode]
+    val tpe = typeOf[ANode]
     val clazz = tpe.typeSymbol.asClass
     clazz.knownDirectSubclasses.foreach {
-      case clz: ru.ClassSymbol =>
+      case clz: ClassSymbol =>
         val cType = clz.toType
         types.put(clz.fullName, cType)
         fields.put(clz.fullName, ReflectUtils.getFields(cType))
@@ -256,23 +256,23 @@ object ANode {
     }
   }
 
-  def getType(node: ANode): ru.Type = {
+  def getType(node: ANode): Type = {
     while (!isInited.get) {
       init()
       isInited.set(true)
     }
     val name = node.getClass.getCanonicalName
-    types.getOrElse(name, null.asInstanceOf[ru.Type])
+    types.getOrElse(name, null.asInstanceOf[Type])
   }
 
-  def getFields(node: ANode): List[ru.TermSymbol] = {
+  def getFields(node: ANode): List[TermSymbol] = {
     while (!isInited.get) {
       init()
       isInited.set(true)
     }
 
     val name = node.getClass.getCanonicalName
-    fields.getOrElse(name, null.asInstanceOf[List[ru.TermSymbol]])
+    fields.getOrElse(name, null.asInstanceOf[List[TermSymbol]])
   }
 
   def apply(neighs: Array[VertexId]): ANode = new NodeN(neighs)

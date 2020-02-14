@@ -1,44 +1,39 @@
 package com.tencent.angel.graph.core.psf.get
 
 import java.util
-
-import scala.reflect.runtime.universe._
 import com.tencent.angel.ml.matrix.psf.get.base._
 import com.tencent.angel.ps.storage.vector.ServerRow
 
-abstract class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
+
+class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
+  def this() = this(null)
+
   override def merge(list: util.List[PartitionGetResult]): GetResult = {
     val gpRes = list.get(0).asInstanceOf[GPartitionGetResult]
+    val doMerge = MergeOp.get(gpRes.mergeFuncId)
     val tpe = gpRes.tpe
-    val pResults = (0 until list.size()).map{ idx =>
+
+    var result: Any = MergeOp.getInit(gpRes.mergeFuncId)
+    (0 until list.size()).foreach { idx =>
       val pRes = list.get(idx).asInstanceOf[GPartitionGetResult]
-      pRes.pResult
-    }.toList
+      result = doMerge(tpe, result, pRes.pResult)
+    }
 
-    val (oTpe, result) = doMerge(tpe, pResults)
-
-    GGetResult(oTpe, result)
+    GGetResult(result)
   }
-
-  def doMerge(tpe: Type, pResults: List[Any]): (Type, Any)
 
   override def partitionGet(partitionGetParam: PartitionGetParam): PartitionGetResult = {
     val pp = partitionGetParam.asInstanceOf[GPartitionGetParam]
-    val row: ServerRow = getRow(pp.getMatrixId, pp.getPartKey.getPartitionId)
+    val row: ServerRow = psContext.getMatrixStorageManager.getRow(
+      pp.getMatrixId, 0, pp.getPartKey.getPartitionId)
+    val doGet = pp.getFunc.asInstanceOf[GetOp]
 
     row.startRead()
     try {
-      val (tpe, pGet) = doGet(pp.getPartKey.getPartitionId, row, pp.tpe, pp.params)
-      new GPartitionGetResult(tpe, pGet)
+      val (tpe, pGet) = doGet(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, row, pp.tpe, pp.params)
+      new GPartitionGetResult(tpe, pGet, pp.mergeFunc.asInstanceOf[Int])
     } finally {
       row.endRead()
     }
-  }
-
-  def doGet(pId:Int, row: ServerRow, tpe: Type, partParam: Any): (Type, Any)
-
-  def getRow(mId: Int, pId: Int): ServerRow = {
-    this.psContext.getMatrixStorageManager
-      .getRow(mId, 0, pId)
   }
 }

@@ -1,5 +1,7 @@
 package com.tencent.angel.graph.utils
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 import com.tencent.angel.common.Serialize
 import com.tencent.angel.ml.math2.storage._
 import com.tencent.angel.ml.math2.vector._
@@ -1660,4 +1662,67 @@ object SerDe {
 
     bufferLen(inst, fields)
   }
+
+  // 5. for java Serialize
+  def javaSerialize(obj: Any, byteBuf: ByteBuf): Unit = {
+    val baos = new ByteArrayOutputStream(2048)
+    val outObj = new ObjectOutputStream(baos)
+
+    outObj.writeObject(obj)
+
+    outObj.flush()
+    outObj.close()
+    val dataObj = baos.toByteArray
+    byteBuf.writeInt(dataObj.length).writeBytes(dataObj)
+
+    baos.close()
+  }
+
+  def javaSerBufferSize(obj: Any): Int = {
+    val baos = new ByteArrayOutputStream(2048)
+    val outObj = new ObjectOutputStream(baos)
+
+    outObj.writeObject(obj)
+
+    outObj.flush()
+    outObj.close()
+
+    val size = baos.size()
+    baos.close()
+
+    size + 4
+  }
+
+  def javaSer2Bytes(obj: Any): Array[Byte] = {
+    val baos = new ByteArrayOutputStream(2048)
+    val outObj = new ObjectOutputStream(baos)
+
+    outObj.writeObject(obj)
+
+    outObj.flush()
+    outObj.close()
+    val dataObj = baos.toByteArray
+    baos.close()
+
+    dataObj
+  }
+
+  def javaDeserialize[T](byteBuf: ByteBuf): T = {
+    val size = byteBuf.readInt()
+
+    val dataObj = new Array[Byte](size)
+    byteBuf.readBytes(dataObj)
+    val bais = new ByteArrayInputStream(dataObj)
+    val inObj = new ObjectInputStream(bais)
+
+    val obj = inObj.readObject()
+
+    inObj.close()
+    if (bais != null) {
+      bais.close()
+    }
+
+    obj.asInstanceOf[T]
+  }
+
 }

@@ -1,5 +1,6 @@
 package com.tencent.angel.graph.utils
 
+import com.tencent.angel.graph.VertexId
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
 import com.tencent.angel.ml.math2.vector.Vector
@@ -39,24 +40,6 @@ object GUtils {
     case _ => false
   }
 
-  def getIntKeys(value: Any): Array[Int] = {
-    val (size, iterator) = value match {
-      case v: Int2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
-      case v: Int2CharOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2ByteOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2ShortOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2IntOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2LongOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2FloatOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2DoubleOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Int2ObjectOpenHashMap[_] =>  (v.size(), v.keySet().iterator())
-      case _ =>
-        throw new Exception("error type!")
-    }
-
-    Array.tabulate[Int](size)(_ => iterator.nextInt())
-  }
-
   def isLongKeyFastMap(tpe: Type): Boolean = tpe match {
     case t if t =:= typeOf[Long2BooleanOpenHashMap] => true
     case t if t =:= typeOf[Long2CharOpenHashMap] => true
@@ -70,22 +53,39 @@ object GUtils {
     case _ => false
   }
 
-  def getLongKeys(value: Any): Array[Long] = {
-    val (size, iterator) = value match {
-      case v: Long2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
-      case v: Long2CharOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2ByteOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2ShortOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2IntOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2LongOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2FloatOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2DoubleOpenHashMap =>  (v.size(), v.keySet().iterator())
-      case v: Long2ObjectOpenHashMap[_] =>  (v.size(), v.keySet().iterator())
-      case _ =>
-        throw new Exception("error type!")
+  def getFastMapKeys(value: Any): Array[VertexId] = {
+    typeOf[VertexId] match {
+      case t if t =:= typeOf[Int] =>
+        val (size, iterator) = value match {
+          case v: Int2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2CharOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2ByteOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2ShortOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2IntOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2LongOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2FloatOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2DoubleOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Int2ObjectOpenHashMap[_] => (v.size(), v.keySet().iterator())
+          case _ =>
+            throw new Exception("error type!")
+        }
+        Array.tabulate[VertexId](size)(_ => iterator.nextInt().asInstanceOf[VertexId])
+      case t if t =:= typeOf[Long] =>
+        val (size, iterator) = value match {
+          case v: Long2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2CharOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2ByteOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2ShortOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2IntOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2LongOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2FloatOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2DoubleOpenHashMap => (v.size(), v.keySet().iterator())
+          case v: Long2ObjectOpenHashMap[_] => (v.size(), v.keySet().iterator())
+          case _ =>
+            throw new Exception("error type!")
+        }
+        Array.tabulate[VertexId](size)(_ => iterator.nextLong().asInstanceOf[VertexId])
     }
-
-    Array.tabulate[Long](size)(_ => iterator.nextLong())
   }
 
   def isFastMap(tpe: Type): Boolean = isIntKeyFastMap(tpe) || isLongKeyFastMap(tpe)

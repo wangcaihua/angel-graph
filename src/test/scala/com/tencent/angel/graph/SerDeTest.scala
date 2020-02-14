@@ -1,5 +1,7 @@
 package com.tencent.angel.graph
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
 import com.tencent.angel.ml.math2.VFactory
 import io.netty.buffer.{ByteBuf, Unpooled}
@@ -199,4 +201,12 @@ class SerDeTest extends AnyFunSuite {
     print("OK")
   }
 
+  test("ser java obj"){
+    val out = new ByteArrayOutputStream(2048)
+    val objOut = new ObjectOutputStream(directBuf)
+    objOut.writeObject(op)
+
+    val in = new ByteArrayInputStream(out.toByteArray)
+    val inObj = new ObjectInputStream(in)
+  }
 }
