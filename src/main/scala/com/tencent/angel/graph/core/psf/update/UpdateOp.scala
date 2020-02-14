@@ -2,7 +2,7 @@ package com.tencent.angel.graph.core.psf.update
 
 import java.util.concurrent.atomic.AtomicInteger
 
-//import com.tencent.angel.graph.core.psf.utils.CCleaner
+import com.tencent.angel.graph.core.psf.utils.CCleaner
 import com.tencent.angel.graph.utils.SerDe
 import com.tencent.angel.ps.PSContext
 import com.tencent.angel.ps.storage.vector.ServerRow
@@ -21,10 +21,10 @@ object UpdateOp {
   def apply(func: (PSContext, Int, Int, ServerRow, Type, Any) => Unit): Int = {
     val fId = ids.getAndIncrement()
 
-    // val cleanedFunc = CCleaner.clean(func)
+    val cleanedFunc = CCleaner.clean(func)
     val op = new UpdateOp {
       override def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): Unit = {
-        func(psContext, mId, pId, row, tpe, partParam)
+        cleanedFunc(psContext, mId, pId, row, tpe, partParam)
       }
     }
 

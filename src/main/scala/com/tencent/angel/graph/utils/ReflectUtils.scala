@@ -54,7 +54,7 @@ object ReflectUtils {
         case inst: InstanceMirror => inst
         case o: Any => mirror.reflect(o)
       }
-
+      
       val field = instMirror.symbol.typeSignature.member(TermName(fieldName)).asTerm
       instMirror.reflectField(field)
     } else {

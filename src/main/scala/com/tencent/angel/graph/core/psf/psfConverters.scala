@@ -7,6 +7,7 @@ import com.tencent.angel.ps.storage.vector.ServerRow
 import com.tencent.angel.spark.models.PSMatrix
 
 import scala.reflect.runtime.universe._
+import scala.language.implicitConversions
 
 class Get(psMatrix: PSMatrix) {
   def get[T: TypeTag, U](getParam: T, mergeParam: U)
@@ -16,7 +17,7 @@ class Get(psMatrix: PSMatrix) {
     val mergeFuncId = MergeOp(mergeFunc)
     MergeOp.setInit(mergeFuncId, mergeParam)
 
-    val param = GGetParam(psMatrix.id, param, getFuncId, mergeFuncId)
+    val param = GGetParam[T](psMatrix.id, getParam, getFuncId, mergeFuncId)
     val func = new GGetFunc(param)
     val result = psMatrix.asyncPsfGet(func).get
       .asInstanceOf[GGetResult]
@@ -54,7 +55,7 @@ class Update(psMatrix: PSMatrix) {
                         (updateFunc: (PSContext, Int, Int, ServerRow, Type, Any) => Unit): Unit = {
     val updateFuncId = UpdateOp(updateFunc)
 
-    val param = GUpdateParam(psMatrix.id, param, updateFuncId)
+    val param = GUpdateParam[T](psMatrix.id, updateParam, updateFuncId)
     val func = new GUpdateFunc(param)
     psMatrix.asyncPsfUpdate(func).get
 

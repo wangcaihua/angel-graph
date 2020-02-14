@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
 
 import scala.reflect.runtime.universe._
+import scala.language.existentials
 
 object Merger {
   def mergeFastMap(typ:Type, list: List[Any]): Any = {

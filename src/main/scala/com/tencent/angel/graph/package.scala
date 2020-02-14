@@ -12,4 +12,10 @@ package object graph {
   val NEIGHBOR_ATTRIBUTE = 5
   val WEIGHT_ATTRIBUTE = 6
   val OTHER = 7
+
+  val ASM5 = 5 << 16 | 0 << 8 | 0
+  val GETFIELD = 180
+  val INVOKEVIRTUAL = 182
+  val INVOKESPECIAL = 183
+  val NEW = 187
 }

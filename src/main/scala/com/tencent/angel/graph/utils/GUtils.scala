@@ -1,9 +1,12 @@
 package com.tencent.angel.graph.utils
 
+import java.io.{FileInputStream, FileOutputStream, InputStream, OutputStream}
+import java.nio.channels.FileChannel
+
 import com.tencent.angel.graph.VertexId
+import com.tencent.angel.ml.math2.vector.Vector
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
-import com.tencent.angel.ml.math2.vector.Vector
 
 import scala.reflect.runtime.universe._
 
@@ -91,4 +94,79 @@ object GUtils {
   def isFastMap(tpe: Type): Boolean = isIntKeyFastMap(tpe) || isLongKeyFastMap(tpe)
 
   def isVector(tpe: Type): Boolean = tpe.weak_<:<(typeOf[Vector])
+
+  def copyStream(in: InputStream, out: OutputStream,
+                 closeStreams: Boolean = false, transferToEnabled: Boolean = false): Long = {
+    tryWithSafeFinally {
+      if (in.isInstanceOf[FileInputStream] && out.isInstanceOf[FileOutputStream]
+        && transferToEnabled) {
+        // When both streams are File stream, use transferTo to improve copy performance.
+        val inChannel = in.asInstanceOf[FileInputStream].getChannel()
+        val outChannel = out.asInstanceOf[FileOutputStream].getChannel()
+        val size = inChannel.size()
+        copyFileStreamNIO(inChannel, outChannel, 0, size)
+        size
+      } else {
+        var count = 0L
+        val buf = new Array[Byte](8192)
+        var n = 0
+        while (n != -1) {
+          n = in.read(buf)
+          if (n != -1) {
+            out.write(buf, 0, n)
+            count += n
+          }
+        }
+        count
+      }
+    } {
+      if (closeStreams) {
+        try {
+          in.close()
+        } finally {
+          out.close()
+        }
+      }
+    }
+  }
+
+  private def copyFileStreamNIO(input: FileChannel, output: FileChannel,
+                                startPosition: Long, bytesToCopy: Long): Unit = {
+    val initialPos = output.position()
+    var count = 0L
+    while (count < bytesToCopy) {
+      count += input.transferTo(count + startPosition, bytesToCopy - count, output)
+    }
+    assert(count == bytesToCopy,
+      s"request to copy $bytesToCopy bytes, but actually copied $count bytes.")
+
+    val finalPos = output.position()
+    val expectedPos = initialPos + bytesToCopy
+    assert(finalPos == expectedPos,
+      s"""
+         |Current position $finalPos do not equal to expected position $expectedPos
+         |after transferTo, please check your kernel version to see if it is 2.6.32,
+         |this is a kernel bug which will lead to unexpected behavior when using transferTo.
+         |You can set spark.file.transferTo = false to disable this NIO feature.
+           """.stripMargin)
+  }
+
+  private def tryWithSafeFinally[T](block: => T)(finallyBlock: => Unit): T = {
+    var originalThrowable: Throwable = null
+    try {
+      block
+    } catch {
+      case t: Throwable =>
+        originalThrowable = t
+        throw originalThrowable
+    } finally {
+      try {
+        finallyBlock
+      } catch {
+        case t: Throwable if originalThrowable != null && originalThrowable != t =>
+          originalThrowable.addSuppressed(t)
+          throw originalThrowable
+      }
+    }
+  }
 }

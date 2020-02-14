@@ -2,7 +2,7 @@ package com.tencent.angel.graph.core.psf.get
 
 import java.util.concurrent.atomic.AtomicInteger
 
-//import com.tencent.angel.graph.core.psf.utils.CCleaner
+import com.tencent.angel.graph.core.psf.utils.CCleaner
 import com.tencent.angel.graph.utils.SerDe
 import com.tencent.angel.ps.PSContext
 import com.tencent.angel.ps.storage.vector.ServerRow
@@ -22,14 +22,14 @@ object GetOp {
   def apply(func: (PSContext, Int, Int, ServerRow, Type, Any) => (Type, Any)): Int = {
     val fId = ids.getAndIncrement()
 
-    //val cleanedFunc = CCleaner.clean(func)
+    val cleanedFunc = CCleaner.clean(func)
     val op = new GetOp {
       override def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): (Type, Any) = {
-        func(psContext, mId, pId, row, tpe, partParam)
+        cleanedFunc(psContext, mId, pId, row, tpe, partParam)
       }
     }
 
-    cache.synchronized{
+    cache.synchronized {
       cache.put(fId, SerDe.javaSer2Bytes(op))
     }
 
