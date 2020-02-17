@@ -49,7 +49,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
         (0 until parts.size()).foreach { idx =>
           val pp = new GPartitionUpdateParam(matrixId, parts.get(idx), updateClock,
             NonSplitter(), tpe, params, operation)
-          splits.set(idx, pp)
+          splits.add(pp)
         }
 
         splits
@@ -69,11 +69,11 @@ object GUpdateParam {
     new GUpdateParam[Byte](matrixId, false, 0.toByte, operation)
   }
 
-  def apply[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: Int) = {
+  def apply[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: Int): GUpdateParam[T] = {
     new GUpdateParam[T](mId, uClock, params, operation)
   }
 
-  def apply[T: TypeTag](mId: Int, params: T, operation: Int) = {
+  def apply[T: TypeTag](mId: Int, params: T, operation: Int): GUpdateParam[T] = {
     new GUpdateParam[T](mId, false, params, operation)
   }
 }

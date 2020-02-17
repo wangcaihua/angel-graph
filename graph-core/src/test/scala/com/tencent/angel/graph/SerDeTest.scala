@@ -201,12 +201,4 @@ class SerDeTest extends AnyFunSuite {
     print("OK")
   }
 
-  test("ser java obj"){
-    val out = new ByteArrayOutputStream(2048)
-    val objOut = new ObjectOutputStream(directBuf)
-    objOut.writeObject(op)
-
-    val in = new ByteArrayInputStream(out.toByteArray)
-    val inObj = new ObjectInputStream(in)
-  }
 }

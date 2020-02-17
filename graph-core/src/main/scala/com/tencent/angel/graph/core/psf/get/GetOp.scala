@@ -9,7 +9,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 
 import scala.reflect.runtime.universe._
 
-trait GetOp {
+trait GetOp extends Serializable {
   def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): (Type, Any)
 }
 
@@ -21,7 +21,7 @@ object GetOp {
   def apply(func: (PSContext, Int, Int, ServerRow, Type, Any) => (Type, Any)): Int = {
     val fId = ids.getAndIncrement()
 
-    val op = new GetOp {
+    val op = new GetOp with Serializable {
       override def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): (Type, Any) = {
         func(psContext, mId, pId, row, tpe, partParam)
       }

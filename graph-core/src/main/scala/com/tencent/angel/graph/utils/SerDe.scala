@@ -159,25 +159,34 @@ object SerDe {
       byteBuf.writeInt(end - start)
       typ match {
         case bool if bool =:= typeOf[Boolean] =>
-          arr.asInstanceOf[Array[Boolean]].foreach(e => byteBuf.writeBoolean(e))
+          val array = arr.asInstanceOf[Array[Boolean]]
+          (start until end).foreach(idx => byteBuf.writeBoolean(array(idx)))
         case byte if byte =:= typeOf[Byte] =>
-          arr.asInstanceOf[Array[Byte]].foreach(e => byteBuf.writeByte(e))
+          val array = arr.asInstanceOf[Array[Byte]]
+          (start until end).foreach(idx => byteBuf.writeByte(array(idx)))
         case char if char =:= typeOf[Char] =>
-          arr.asInstanceOf[Array[Char]].foreach(e => byteBuf.writeChar(e))
+          val array = arr.asInstanceOf[Array[Char]]
+          (start until end).foreach(idx => byteBuf.writeChar(array(idx)))
         case short if short =:= typeOf[Short] =>
-          arr.asInstanceOf[Array[Short]].foreach(e => byteBuf.writeShort(e))
+          val array = arr.asInstanceOf[Array[Short]]
+          (start until end).foreach(idx => byteBuf.writeShort(array(idx)))
         case int if int =:= typeOf[Int] =>
-          arr.asInstanceOf[Array[Int]].foreach(e => byteBuf.writeInt(e))
+          val array = arr.asInstanceOf[Array[Int]]
+          (start until end).foreach(idx => byteBuf.writeInt(array(idx)))
         case long if long =:= typeOf[Long] =>
-          arr.asInstanceOf[Array[Long]].foreach(e => byteBuf.writeLong(e))
+          val array = arr.asInstanceOf[Array[Long]]
+          (start until end).foreach(idx => byteBuf.writeLong(array(idx)))
         case float if float =:= typeOf[Float] =>
-          arr.asInstanceOf[Array[Float]].foreach(e => byteBuf.writeFloat(e))
+          val array = arr.asInstanceOf[Array[Float]]
+          (start until end).foreach(idx => byteBuf.writeFloat(array(idx)))
         case double if double =:= typeOf[Double] =>
-          arr.asInstanceOf[Array[Double]].foreach(e => byteBuf.writeDouble(e))
+          val array = arr.asInstanceOf[Array[Double]]
+          (start until end).foreach(idx => byteBuf.writeDouble(array(idx)))
         case str if str =:= typeOf[String] =>
-          arr.asInstanceOf[Array[String]].foreach { e =>
-            byteBuf.writeInt(e.length)
-            byteBuf.writeBytes(e.getBytes)
+          val array = arr.asInstanceOf[Array[String]]
+          (start until end).foreach { idx =>
+            val strBytes = array(idx).getBytes
+            byteBuf.writeInt(strBytes.length).writeBytes(strBytes)
           }
         case t =>
           throw new Exception(s"type ${t.toString} cannot serialize")
@@ -294,8 +303,9 @@ object SerDe {
         case double if double =:= typeOf[Double] =>
           len += length * 8
         case str if str =:= typeOf[String] =>
-          arr.asInstanceOf[Array[String]].foreach { e =>
-            len += e.getBytes.length + 4
+          val array = arr.asInstanceOf[Array[String]]
+          (start until end).foreach { idx =>
+            len += array(idx).getBytes.length + 4
           }
         case t =>
           throw new Exception(s"type ${t.toString} cannot serialize")
@@ -1653,7 +1663,7 @@ object SerDe {
     len
   }
 
-  def bufferLen(obj: Any):Int = {
+  def bufferLen(obj: Any): Int = {
     val inst = obj match {
       case instMirror: InstanceMirror => instMirror
       case _ => ReflectUtils.instMirror(obj)
@@ -1709,6 +1719,10 @@ object SerDe {
 
   def javaDeserialize[T](byteBuf: ByteBuf): T = {
     val size = byteBuf.readInt()
+
+    if (size <= 0) {
+      throw new Exception("no data to deserialize!")
+    }
 
     val dataObj = new Array[Byte](size)
     byteBuf.readBytes(dataObj)

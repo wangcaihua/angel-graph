@@ -25,7 +25,7 @@ object RangeSplitter {
     var lastNodeIndex: Int = 0
     var currNodeIndex: Int = 0
     nodeIds.foreach { value =>
-      if (part.getStartCol >= value && value < part.getEndCol) {
+      if (part.getStartCol <= value && value < part.getEndCol) {
         currNodeIndex += 1
       } else {
         // 1. add a new split
@@ -40,6 +40,11 @@ object RangeSplitter {
         lastNodeIndex = currNodeIndex
         currNodeIndex += 1
       }
+    }
+
+    if (currNodeIndex - lastNodeIndex > 1 && currNodeIndex <= part.getEndCol) {
+      val split = new RangeSplitter(part, nodeIds, lastNodeIndex, currNodeIndex)
+      result.append(split)
     }
 
     result.toList

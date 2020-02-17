@@ -42,7 +42,7 @@ object ParamSerDe {
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)
     } else if (GUtils.isPrimitiveArray(tpe)) {
-      SerDe.arrFromBuffer(tpe, buf)
+      SerDe.arrFromBuffer(tpe.typeArgs.head, buf)
     } else if (GUtils.isFastMap(tpe)) {
       SerDe.fastMapFromBuffer(tpe, buf)
     } else if (tpe <:< typeOf[Serialize]) {

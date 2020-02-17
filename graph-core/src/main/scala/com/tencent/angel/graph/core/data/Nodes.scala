@@ -4,8 +4,8 @@ import java.io.{DataInputStream, DataOutputStream}
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.tencent.angel.graph.core.sampler._
-import com.tencent.angel.graph.{VertexId, WgtTpe}
 import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
+import com.tencent.angel.graph.{VertexId, WgtTpe}
 import com.tencent.angel.ml.math2.vector.Vector
 import com.tencent.angel.ps.storage.vector.element.IElement
 import io.netty.buffer.ByteBuf
