@@ -3,12 +3,16 @@ package com.tencent.angel.graph.core.data
 
 import it.unimi.dsi.fastutil.HashCommon
 import it.unimi.dsi.fastutil.ints._
+import it.unimi.dsi.fastutil.longs._
 
 import scala.reflect.runtime.universe._
 
 
 class IntKeyRefHashMap[V: TypeTag](mask: Int, n: Int, containsNullKey: Boolean,
                                    private val keys: Array[Int], private val values: Array[V]) {
+  private val tpe = typeOf[V]
+
+  private def getValues[T]: Array[T] = values.asInstanceOf[Array[T]]
 
   def find(key: Int): Int = {
     if (key == 0) {
@@ -44,63 +48,69 @@ class IntKeyRefHashMap[V: TypeTag](mask: Int, n: Int, containsNullKey: Boolean,
     this
   }
 
-  def putAll[U](map: U): this.type = {
+  def putAll[U: TypeTag](map: U): this.type = {
     map match {
-      case m: Int2BooleanOpenHashMap =>
+      case m: Int2BooleanOpenHashMap if tpe =:= typeOf[Boolean] =>
         val values: Array[Boolean] = getValues[Boolean]
         val iter = m.int2BooleanEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getBooleanValue
         }
-      case m: Int2ByteOpenHashMap =>
+      case m: Int2ByteOpenHashMap if tpe =:= typeOf[Byte] =>
         val values: Array[Byte] = getValues[Byte]
         val iter = m.int2ByteEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getByteValue
         }
-      case m: Int2CharOpenHashMap =>
+      case m: Int2CharOpenHashMap if tpe =:= typeOf[Char] =>
         val values: Array[Char] = getValues[Char]
         val iter = m.int2CharEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getCharValue
         }
-      case m: Int2ShortOpenHashMap =>
+      case m: Int2ShortOpenHashMap if tpe =:= typeOf[Short] =>
         val values: Array[Short] = getValues[Short]
         val iter = m.int2ShortEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getShortValue
         }
-      case m: Int2IntOpenHashMap =>
+      case m: Int2IntOpenHashMap if tpe =:= typeOf[Int] =>
         val values: Array[Int] = getValues[Int]
         val iter = m.int2IntEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getIntValue
         }
-      case m: Int2LongOpenHashMap =>
+      case m: Int2LongOpenHashMap if tpe =:= typeOf[Long] =>
         val values: Array[Long] = getValues[Long]
         val iter = m.int2LongEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getLongValue
         }
-      case m: Int2FloatOpenHashMap =>
+      case m: Int2FloatOpenHashMap if tpe =:= typeOf[Float] =>
         val values: Array[Float] = getValues[Float]
         val iter = m.int2FloatEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getFloatValue
         }
-      case m: Int2DoubleOpenHashMap =>
+      case m: Int2DoubleOpenHashMap if tpe =:= typeOf[Double] =>
         val values: Array[Double] = getValues[Double]
         val iter = m.int2DoubleEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
           values(find(entry.getIntKey)) = entry.getDoubleValue
+        }
+      case m: Int2ObjectOpenHashMap[_] if typeOf[V] =:= typeOf[U].typeArgs.head =>
+        val iter = m.int2ObjectEntrySet().fastIterator()
+        while (iter.hasNext) {
+          val entry = iter.next()
+          values(find(entry.getIntKey)) = entry.getValue.asInstanceOf[V]
         }
     }
 
@@ -229,6 +239,10 @@ class IntKeyRefHashMap[V: TypeTag](mask: Int, n: Int, containsNullKey: Boolean,
 
 class LongKeyRefHashMap[V: TypeTag](mask: Int, n: Int, containsNullKey: Boolean,
                                     private val keys: Array[Long], private val values: Array[V]) {
+  private val tpe = typeOf[V]
+
+  private def getValues[T]: Array[T] = values.asInstanceOf[Array[T]]
+
   def find(key: Long): Int = {
     if (key == 0) {
       if (containsNullKey) n else -(n + 1)
@@ -263,63 +277,69 @@ class LongKeyRefHashMap[V: TypeTag](mask: Int, n: Int, containsNullKey: Boolean,
     this
   }
 
-  def putAll[U](map: U): this.type = {
+  def putAll[U: TypeTag](map: U): this.type = {
     map match {
-      case m: Int2BooleanOpenHashMap =>
+      case m: Long2BooleanOpenHashMap if tpe =:= typeOf[Boolean] =>
         val values: Array[Boolean] = getValues[Boolean]
-        val iter = m.int2BooleanEntrySet().fastIterator()
+        val iter = m.long2BooleanEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getBooleanValue
+          values(find(entry.getLongKey)) = entry.getBooleanValue
         }
-      case m: Int2ByteOpenHashMap =>
+      case m: Long2ByteOpenHashMap if tpe =:= typeOf[Byte] =>
         val values: Array[Byte] = getValues[Byte]
-        val iter = m.int2ByteEntrySet().fastIterator()
+        val iter = m.long2ByteEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getByteValue
+          values(find(entry.getLongKey)) = entry.getByteValue
         }
-      case m: Int2CharOpenHashMap =>
+      case m: Long2CharOpenHashMap if tpe =:= typeOf[Char] =>
         val values: Array[Char] = getValues[Char]
-        val iter = m.int2CharEntrySet().fastIterator()
+        val iter = m.long2CharEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getCharValue
+          values(find(entry.getLongKey)) = entry.getCharValue
         }
-      case m: Int2ShortOpenHashMap =>
+      case m: Long2ShortOpenHashMap if tpe =:= typeOf[Short] =>
         val values: Array[Short] = getValues[Short]
-        val iter = m.int2ShortEntrySet().fastIterator()
+        val iter = m.long2ShortEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getShortValue
+          values(find(entry.getLongKey)) = entry.getShortValue
         }
-      case m: Int2IntOpenHashMap =>
+      case m: Long2IntOpenHashMap if tpe =:= typeOf[Int] =>
         val values: Array[Int] = getValues[Int]
-        val iter = m.int2IntEntrySet().fastIterator()
+        val iter = m.long2IntEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getIntValue
+          values(find(entry.getLongKey)) = entry.getIntValue
         }
-      case m: Int2LongOpenHashMap =>
+      case m: Long2LongOpenHashMap if tpe =:= typeOf[Long] =>
         val values: Array[Long] = getValues[Long]
-        val iter = m.int2LongEntrySet().fastIterator()
+        val iter = m.long2LongEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getLongValue
+          values(find(entry.getLongKey)) = entry.getLongValue
         }
-      case m: Int2FloatOpenHashMap =>
+      case m: Long2FloatOpenHashMap if tpe =:= typeOf[Float] =>
         val values: Array[Float] = getValues[Float]
-        val iter = m.int2FloatEntrySet().fastIterator()
+        val iter = m.long2FloatEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getFloatValue
+          values(find(entry.getLongKey)) = entry.getFloatValue
         }
-      case m: Int2DoubleOpenHashMap =>
+      case m: Long2DoubleOpenHashMap if tpe =:= typeOf[Double] =>
         val values: Array[Double] = getValues[Double]
-        val iter = m.int2DoubleEntrySet().fastIterator()
+        val iter = m.long2DoubleEntrySet().fastIterator()
         while (iter.hasNext) {
           val entry = iter.next()
-          values(find(entry.getIntKey)) = entry.getDoubleValue
+          values(find(entry.getLongKey)) = entry.getDoubleValue
+        }
+      case m: Long2ObjectOpenHashMap[_] if typeOf[V] =:= typeOf[U].typeArgs.head =>
+        val iter = m.long2ObjectEntrySet().fastIterator()
+        while (iter.hasNext) {
+          val entry = iter.next()
+          values(find(entry.getLongKey)) = entry.getValue.asInstanceOf[V]
         }
     }
 

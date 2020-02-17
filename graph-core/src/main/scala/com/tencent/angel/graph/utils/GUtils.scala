@@ -4,6 +4,7 @@ import java.io.{FileInputStream, FileOutputStream, InputStream, OutputStream}
 import java.nio.channels.FileChannel
 
 import com.tencent.angel.graph.VertexId
+import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.vector.Vector
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
@@ -94,6 +95,15 @@ object GUtils {
   def isFastMap(tpe: Type): Boolean = isIntKeyFastMap(tpe) || isLongKeyFastMap(tpe)
 
   def isVector(tpe: Type): Boolean = tpe.weak_<:<(typeOf[Vector])
+
+  def paramCheck(tpe: Type): Boolean = {
+    tpe match {
+      case t if GUtils.isPrimitive(t) => true
+      case t if GUtils.isPrimitiveArray(t) => true
+      case t if GUtils.isFastMap(t) => true
+      case t => t.weak_<:<(typeOf[GData]) && t.typeSymbol.asClass.isCaseClass
+    }
+  }
 
   def copyStream(in: InputStream, out: OutputStream,
                  closeStreams: Boolean = false, transferToEnabled: Boolean = false): Long = {

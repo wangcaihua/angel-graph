@@ -11,7 +11,7 @@ trait MergeOp {
 object MergeOp {
   private val ids = new AtomicInteger(0)
   private val cache = new Int2ObjectOpenHashMap[MergeOp]()
-  private val inits = new Int2ObjectOpenHashMap[Any]()
+
 
   def apply(func: (Type, Any, Any) => Any): Int = {
     val fId = ids.getAndIncrement()
@@ -37,24 +37,6 @@ object MergeOp {
     cache.synchronized {
       if (cache.containsKey(fid)) {
         cache.remove(fid)
-      }
-    }
-  }
-
-  def setInit(fid: Int, init: Any): Unit = {
-    inits.synchronized{
-      inits.put(fid, init)
-    }
-  }
-
-  def getInit(fid: Int): Any = {
-    inits.get(fid)
-  }
-
-  def removeInit(fid: Int): Unit = {
-    inits.synchronized {
-      if (inits.containsKey(fid)) {
-        inits.remove(fid)
       }
     }
   }

@@ -3,7 +3,7 @@ package com.tencent.angel.graph.core.data
 import java.util
 
 import scala.reflect.ClassTag
-
+import scala.reflect.runtime.universe._
 
 class RefHashMapManager(ref: AnyRef, matrixId: Int, partitionId: Int) {
   private val clz = ref.getClass
@@ -62,7 +62,7 @@ class RefHashMapManager(ref: AnyRef, matrixId: Int, partitionId: Int) {
     }
   }
 
-  def getIntKeyHashMap[V](name: String): IntKeyRefHashMap[V] = {
+  def getIntKeyHashMap[V: TypeTag](name: String): IntKeyRefHashMap[V] = {
     if (!valueMap.containsKey(name)) {
       throw new Exception(s"cannot find $name in valueMap !")
     }
@@ -77,7 +77,7 @@ class RefHashMapManager(ref: AnyRef, matrixId: Int, partitionId: Int) {
     new IntKeyRefHashMap[V](mask, n, containsNullKey, keys, values)
   }
 
-  def getLongKeyHashMap[V](name: String): LongKeyRefHashMap[V] = {
+  def getLongKeyHashMap[V: TypeTag](name: String): LongKeyRefHashMap[V] = {
     if (!valueMap.containsKey(name)) {
       throw new Exception(s"cannot find $name in valueMap !")
     }

@@ -4,13 +4,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import com.tencent.angel.graph.utils.SerDe
 import com.tencent.angel.ps.PSContext
-import com.tencent.angel.ps.storage.vector.ServerRow
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 
 import scala.reflect.runtime.universe._
 
 trait UpdateOp extends Serializable {
-  def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): Unit
+  def apply(psContext: PSContext, mId: Int, pId: Int, tpe: Type, partParam: Any): Unit
 }
 
 object UpdateOp {
@@ -18,12 +17,12 @@ object UpdateOp {
   private val funcs = new Int2ObjectOpenHashMap[UpdateOp]()
   private val cache = new Int2ObjectOpenHashMap[Array[Byte]]()
 
-  def apply(func: (PSContext, Int, Int, ServerRow, Type, Any) => Unit): Int = {
+  def apply(func: (PSContext, Int, Int, Type, Any) => Unit): Int = {
     val fId = ids.getAndIncrement()
 
     val op = new UpdateOp with Serializable {
-      override def apply(psContext: PSContext, mId: Int, pId: Int, row: ServerRow, tpe: Type, partParam: Any): Unit = {
-        func(psContext, mId, pId, row, tpe, partParam)
+      override def apply(psContext: PSContext, mId: Int, pId: Int, tpe: Type, partParam: Any): Unit = {
+        func(psContext, mId, pId, tpe, partParam)
       }
     }
 

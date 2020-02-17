@@ -13,7 +13,7 @@ class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
     val doMerge = MergeOp.get(gpRes.mergeFuncId)
     val tpe = gpRes.tpe
 
-    var result: Any = MergeOp.getInit(gpRes.mergeFuncId)
+    var result: Any = GetPSF.getInit(gpRes.initId)
     (0 until list.size()).foreach { idx =>
       val pRes = list.get(idx).asInstanceOf[GPartitionGetResult]
       result = doMerge(tpe, result, pRes.pResult)
@@ -30,8 +30,8 @@ class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
 
     row.startRead()
     try {
-      val (tpe, pGet) = doGet(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, row, pp.tpe, pp.params)
-      new GPartitionGetResult(tpe, pGet, pp.mergeFunc.asInstanceOf[Int])
+      val (tpe, pGet) = doGet(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
+      new GPartitionGetResult(tpe, pGet, pp.mergeFunc.asInstanceOf[Int], pp.initId)
     } finally {
       row.endRead()
     }

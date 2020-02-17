@@ -13,7 +13,8 @@ import com.tencent.angel.ml.matrix.psf.get.base.{GetParam, PartitionGetParam}
 import com.tencent.angel.psagent.PSAgentContext
 import io.netty.buffer.ByteBuf
 
-class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int) extends GetParam(mId) {
+class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int, initId: Int)
+  extends GetParam(mId) {
 
   override def split(): util.List[PartitionGetParam] = {
     val tpe = typeOf[T]
@@ -25,7 +26,8 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 
       val splits = new util.ArrayList[PartitionGetParam](splitters.size)
       splitters.foreach { splitter =>
-        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params, getFuncId, mergeFuncId)
+        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params,
+          getFuncId, mergeFuncId, initId)
         splits.add(pp)
       }
 
@@ -35,7 +37,8 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 
       val splits = new util.ArrayList[PartitionGetParam](splitters.size)
       splitters.foreach { splitter =>
-        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params, getFuncId, mergeFuncId)
+        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params,
+          getFuncId, mergeFuncId, initId)
         splits.add(pp)
       }
 
@@ -44,7 +47,8 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
       try {
         val splits = new util.ArrayList[PartitionGetParam](parts.size())
         (0 until parts.size()).foreach { idx =>
-          val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), tpe, params, getFuncId, mergeFuncId)
+          val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), tpe, params,
+            getFuncId, mergeFuncId, initId)
           splits.set(idx, pp)
         }
 
@@ -57,22 +61,22 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 }
 
 object GGetParam {
-  def empty(mId: Int, getFuncId: Int, mergeFuncId: Int): GGetParam[Byte] = {
-    new GGetParam[Byte](mId, 0.toByte, getFuncId, mergeFuncId)
+  def empty(mId: Int, getFuncId: Int, mergeFuncId: Int, initId: Int): GGetParam[Byte] = {
+    new GGetParam[Byte](mId, 0.toByte, getFuncId, mergeFuncId, initId)
   }
 
-  def apply[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int) = {
-    new GGetParam[T](mId, params, getFuncId, mergeFuncId)
+  def apply[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int, initId: Int) = {
+    new GGetParam[T](mId, params, getFuncId, mergeFuncId, initId)
   }
 }
 
 
 class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
-                         var tpe: Type, var params: Any, var getFunc: Any, var mergeFunc: Any)
+                         var tpe: Type, var params: Any, var getFunc: Any, var mergeFunc: Any, var initId: Int)
   extends PartitionGetParam(mId, pKey) {
 
   def this() = this(0, null.asInstanceOf[PartitionKey], null.asInstanceOf[Splitter],
-    null.asInstanceOf[Type], null, null, null)
+    null.asInstanceOf[Type], null, null, null, -1)
 
   override def serialize(buf: ByteBuf): Unit = {
     super.serialize(buf)
@@ -82,6 +86,7 @@ class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
     buf.writeInt(dataObj.length).writeBytes(dataObj)
 
     buf.writeInt(mergeFunc.asInstanceOf[Int])
+    buf.writeInt(initId)
   }
 
   override def deserialize(buf: ByteBuf): Unit = {
@@ -93,12 +98,13 @@ class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
 
     getFunc = SerDe.javaDeserialize[GetOp](buf)
     mergeFunc = buf.readInt()
+    initId = buf.readInt()
   }
 
   override def bufferLen(): Int = {
     var len = super.bufferLen()
     len += ParamSerDe.bufferLenSplit(splitter, tpe, params)
-    len += GetOp.get(getFunc.asInstanceOf[Int]).length + 8
+    len += GetOp.get(getFunc.asInstanceOf[Int]).length + 12
     len
   }
 }

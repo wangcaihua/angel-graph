@@ -14,7 +14,7 @@ class GUpdateFunc(uParam: UpdateParam) extends UpdateFunc(uParam) {
 
     row.startWrite()
     try {
-      op(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, row, pp.tpe, pp.params)
+      op(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
     } finally {
       row.endWrite()
     }
