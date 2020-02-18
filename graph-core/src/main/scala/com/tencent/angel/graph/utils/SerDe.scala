@@ -10,7 +10,7 @@ import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.{TypeTag, _}
+import scala.reflect.runtime.universe._
 
 
 object SerDe {
@@ -104,11 +104,7 @@ object SerDe {
   }
 
   // 1. for array
-  def serArr[T: TypeTag](arr: Array[T], byteBuf: ByteBuf): Unit = {
-    serArr(typeOf[T], arr, byteBuf)
-  }
-
-  def serArr(typ: Type, arr: Any, byteBuf: ByteBuf): Unit = {
+  def serArr(arr: Any, byteBuf: ByteBuf): Unit = {
     if (arr == null) {
       byteBuf.writeInt(0)
     } else {
@@ -117,30 +113,28 @@ object SerDe {
         byteBuf.writeInt(0)
       } else {
         byteBuf.writeInt(temp.length)
-        typ match {
-          case bool if bool =:= typeOf[Boolean] =>
+        temp.head match {
+          case _: Boolean =>
             temp.asInstanceOf[Array[Boolean]].foreach(e => byteBuf.writeBoolean(e))
-          case byte if byte =:= typeOf[Byte] =>
+          case _: Byte =>
             temp.asInstanceOf[Array[Byte]].foreach(e => byteBuf.writeByte(e))
-          case char if char =:= typeOf[Char] =>
+          case _: Char =>
             temp.asInstanceOf[Array[Char]].foreach(e => byteBuf.writeChar(e))
-          case short if short =:= typeOf[Short] =>
+          case _: Short =>
             temp.asInstanceOf[Array[Short]].foreach(e => byteBuf.writeShort(e))
-          case int if int =:= typeOf[Int] =>
+          case _: Int =>
             temp.asInstanceOf[Array[Int]].foreach(e => byteBuf.writeInt(e))
-          case long if long =:= typeOf[Long] =>
+          case _: Long =>
             temp.asInstanceOf[Array[Long]].foreach(e => byteBuf.writeLong(e))
-          case float if float =:= typeOf[Float] =>
+          case _: Float =>
             temp.asInstanceOf[Array[Float]].foreach(e => byteBuf.writeFloat(e))
-          case double if double =:= typeOf[Double] =>
+          case _: Double =>
             temp.asInstanceOf[Array[Double]].foreach(e => byteBuf.writeDouble(e))
-          case str if str =:= typeOf[String] =>
+          case _: String =>
             temp.asInstanceOf[Array[String]].foreach { e =>
-              byteBuf.writeInt(e.length)
-              byteBuf.writeBytes(e.getBytes)
+              val bytes = e.getBytes
+              byteBuf.writeInt(bytes.length).writeBytes(bytes)
             }
-          case ser if ser <:< typeOf[Serialize] =>
-            temp.asInstanceOf[Array[Serialize]].foreach(e => e.serialize(byteBuf))
           case t =>
             throw new Exception(s"type ${t.toString} cannot serialize")
         }
@@ -148,41 +142,37 @@ object SerDe {
     }
   }
 
-  def serArr[T: TypeTag](arr: Array[T], start: Int, end: Int, byteBuf: ByteBuf): Unit = {
-    serArr(typeOf[T], arr, start, end, byteBuf)
-  }
-
-  def serArr(typ: Type, arr: Any, start: Int, end: Int, byteBuf: ByteBuf): Unit = {
+  def serArr(arr: Any, start: Int, end: Int, byteBuf: ByteBuf): Unit = {
     if (arr == null || end - start <= 1) {
       byteBuf.writeInt(0)
     } else {
       byteBuf.writeInt(end - start)
-      typ match {
-        case bool if bool =:= typeOf[Boolean] =>
+      arr.asInstanceOf[Array[_]].head match {
+        case _: Boolean =>
           val array = arr.asInstanceOf[Array[Boolean]]
           (start until end).foreach(idx => byteBuf.writeBoolean(array(idx)))
-        case byte if byte =:= typeOf[Byte] =>
+        case _: Byte =>
           val array = arr.asInstanceOf[Array[Byte]]
           (start until end).foreach(idx => byteBuf.writeByte(array(idx)))
-        case char if char =:= typeOf[Char] =>
+        case _: Char =>
           val array = arr.asInstanceOf[Array[Char]]
           (start until end).foreach(idx => byteBuf.writeChar(array(idx)))
-        case short if short =:= typeOf[Short] =>
+        case _: Short =>
           val array = arr.asInstanceOf[Array[Short]]
           (start until end).foreach(idx => byteBuf.writeShort(array(idx)))
-        case int if int =:= typeOf[Int] =>
+        case _: Int =>
           val array = arr.asInstanceOf[Array[Int]]
           (start until end).foreach(idx => byteBuf.writeInt(array(idx)))
-        case long if long =:= typeOf[Long] =>
+        case _: Long =>
           val array = arr.asInstanceOf[Array[Long]]
           (start until end).foreach(idx => byteBuf.writeLong(array(idx)))
-        case float if float =:= typeOf[Float] =>
+        case _: Float =>
           val array = arr.asInstanceOf[Array[Float]]
           (start until end).foreach(idx => byteBuf.writeFloat(array(idx)))
-        case double if double =:= typeOf[Double] =>
+        case _: Double =>
           val array = arr.asInstanceOf[Array[Double]]
           (start until end).foreach(idx => byteBuf.writeDouble(array(idx)))
-        case str if str =:= typeOf[String] =>
+        case _: String =>
           val array = arr.asInstanceOf[Array[String]]
           (start until end).foreach { idx =>
             val strBytes = array(idx).getBytes
@@ -198,13 +188,13 @@ object SerDe {
     arrFromBuffer(typeOf[T], byteBuf).asInstanceOf[Array[T]]
   }
 
-  def arrFromBuffer(etpe: Type, byteBuf: ByteBuf): Any = {
+  def arrFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
     val size = byteBuf.readInt()
 
     if (size == 0) {
       null.asInstanceOf[Any]
     } else {
-      etpe match {
+      tpe match {
         case bool if bool =:= typeOf[Boolean] =>
           Array.tabulate[Boolean](size)(_ => byteBuf.readBoolean())
         case byte if byte =:= typeOf[Byte] =>
@@ -234,39 +224,31 @@ object SerDe {
     }
   }
 
-  def serArrBufSize[T: TypeTag](arr: Any): Int = {
-    serArrBufSize(typeOf[T], arr)
-  }
-
-  def serArrBufSize(typ: Type, arr: Any): Int = {
+  def serArrBufSize(arr: Any): Int = {
     var len = 4
     if (arr != null) {
       val temp = arr.asInstanceOf[Array[_]]
       if (temp.nonEmpty) {
-        typ match {
-          case bool if bool =:= typeOf[Boolean] =>
+        temp.head match {
+          case _: Boolean =>
             len += boolSize * temp.length
-          case byte if byte =:= typeOf[Byte] =>
+          case _: Byte =>
             len += temp.length
-          case char if char =:= typeOf[Char] =>
+          case _: Char =>
             len += charSize * temp.length
-          case short if short =:= typeOf[Short] =>
+          case _: Short =>
             len += shortSize * temp.length
-          case int if int =:= typeOf[Int] =>
+          case _: Int =>
             len += 4 * temp.length
-          case long if long =:= typeOf[Long] =>
+          case _: Long =>
             len += 8 * temp.length
-          case float if float =:= typeOf[Float] =>
+          case _: Float =>
             len += 4 * temp.length
-          case double if double =:= typeOf[Double] =>
+          case _: Double =>
             len += 8 * temp.length
-          case str if str =:= typeOf[String] =>
+          case _: String =>
             temp.asInstanceOf[Array[String]].foreach { e =>
               len += e.getBytes().length + 4
-            }
-          case ser if ser <:< typeOf[Serialize] =>
-            temp.asInstanceOf[Array[Serialize]].foreach { e =>
-              len += e.bufferLen()
             }
           case t =>
             throw new Exception(s"type ${t.toString} cannot serialize")
@@ -277,32 +259,28 @@ object SerDe {
     len
   }
 
-  def serArrBufSize[T: TypeTag](arr: Array[T], start: Int, end: Int): Int = {
-    serArrBufSize(typeOf[T], arr, start, end)
-  }
-
-  def serArrBufSize(typ: Type, arr: Any, start: Int, end: Int): Int = {
+  def serArrBufSize(arr: Any, start: Int, end: Int): Int = {
     var len = 4
     val length = end - start
     if (arr != null && end - start <= 1) {
-      typ match {
-        case bool if bool =:= typeOf[Boolean] =>
+      arr.asInstanceOf[Array[_]].head match {
+        case _: Boolean =>
           len += length * boolSize
-        case byte if byte =:= typeOf[Byte] =>
+        case _: Byte =>
           len += length
-        case char if char =:= typeOf[Char] =>
+        case _: Char =>
           len += length * charSize
-        case short if short =:= typeOf[Short] =>
+        case _: Short =>
           len += length * shortSize
-        case int if int =:= typeOf[Int] =>
+        case _: Int =>
           len += length * 4
-        case long if long =:= typeOf[Long] =>
+        case _: Long =>
           len += length * 8
-        case float if float =:= typeOf[Float] =>
+        case _: Float =>
           len += length * 4
-        case double if double =:= typeOf[Double] =>
+        case _: Double =>
           len += length * 8
-        case str if str =:= typeOf[String] =>
+        case _: String =>
           val array = arr.asInstanceOf[Array[String]]
           (start until end).foreach { idx =>
             len += array(idx).getBytes.length + 4
@@ -1026,20 +1004,15 @@ object SerDe {
           res.put(key, new String(dst))
         }
         res
-      case tp if tp.weak_<:<(typeOf[Int2ObjectOpenHashMap[_]]) && tp.typeArgs.head.weak_<:<(typeOf[Serialize]) =>
-        val etype = tp.typeArgs.head
+      case tp if GUtils.isSerIntKeyMap(tp) =>
         val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
 
-        if (etype.weak_<:<(typeOf[Serialize])) {
-          val put = ReflectUtils.method(outer, "put", typeOf[Int])
-          (0 until size).foreach { _ =>
-            val key = byteBuf.readInt()
-            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
-            inner.deserialize(byteBuf)
-            put(key, inner)
-          }
-        } else {
-          throw new Exception(s"${etype.toString} cannot serialize!")
+        val put = ReflectUtils.method(outer, "put", typeOf[Int])
+        (0 until size).foreach { _ =>
+          val key = byteBuf.readInt()
+          val inner = ReflectUtils.newInstance(tp.typeArgs.head).asInstanceOf[Serialize]
+          inner.deserialize(byteBuf)
+          put(key, inner)
         }
 
         outer
@@ -1173,20 +1146,15 @@ object SerDe {
           res.put(key, new String(dst))
         }
         res
-      case tp if tp.weak_<:<(typeOf[Long2ObjectOpenHashMap[_]]) && tp.typeArgs.head.weak_<:<(typeOf[Serialize]) =>
-        val etype = tp.typeArgs.head
+      case tp if GUtils.isSerLongKeyMap(tp) =>
         val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
 
-        if (etype.weak_<:<(typeOf[Serialize])) {
-          val put = ReflectUtils.method(outer, "put", typeOf[Long])
-          (0 until size).foreach { _ =>
-            val key = byteBuf.readLong()
-            val inner = ReflectUtils.newInstance(etype).asInstanceOf[Serialize]
-            inner.deserialize(byteBuf)
-            put(key, inner)
-          }
-        } else {
-          throw new Exception(s"${etype.toString} cannot serialize!")
+        val put = ReflectUtils.method(outer, "put", typeOf[Long])
+        (0 until size).foreach { _ =>
+          val key = byteBuf.readLong()
+          val inner = ReflectUtils.newInstance(tp.typeArgs.head).asInstanceOf[Serialize]
+          inner.deserialize(byteBuf)
+          put(key, inner)
         }
 
         outer
@@ -1252,8 +1220,8 @@ object SerDe {
   }
 
   // 3. for vector
-  def serVector(vec: Vector, byteBuf: ByteBuf): Unit = {
-    byteBuf.writeLong(vec.dim())
+  def serVector(vec: Any, byteBuf: ByteBuf): Unit = {
+    byteBuf.writeLong(vec.asInstanceOf[Vector].dim())
 
     vec match {
       case id: IntDummyVector =>
@@ -1264,7 +1232,7 @@ object SerDe {
         serArr(ld.getIndices, byteBuf)
       case v: ComponentVector =>
         throw new Exception("vector type is not supported!")
-      case v =>
+      case v: Vector =>
         v.getStorage match {
           case s: IntIntSortedVectorStorage => // 111
             byteBuf.writeInt(111)
@@ -1479,75 +1447,75 @@ object SerDe {
     vectorFromBuffer(typeOf[T], byteBuf).asInstanceOf[T]
   }
 
-  def serVectorBufSize(vec: Vector): Int = {
+  def serVectorBufSize(vec: Any): Int = {
     val len = vec match {
       case id: IntDummyVector =>
-        serArrBufSize[Int](id.getIndices)
+        serArrBufSize(id.getIndices)
       case ld: LongDummyVector =>
-        serArrBufSize[Long](ld.getIndices)
+        serArrBufSize(ld.getIndices)
       case v: ComponentVector =>
         throw new Exception("vector type is not supported!")
-      case v =>
+      case v: Vector =>
         v.getStorage match {
           case s: IntIntSortedVectorStorage => // 111
-            serArrBufSize[Int](s.getIndices) * 2
+            serArrBufSize(s.getIndices) * 2
           case s: IntIntSparseVectorStorage => // 112
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Int2IntOpenHashMap]
             serFastMapBufSize(map)
           case s: IntIntDenseVectorStorage => // 113
-            serArrBufSize[Int](s.getValues)
+            serArrBufSize(s.getValues)
 
           case s: IntLongSortedVectorStorage => // 121
-            serArrBufSize[Int](s.getIndices) + serArrBufSize[Long](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: IntLongSparseVectorStorage => // 122
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Int2LongOpenHashMap]
             serFastMapBufSize(map)
           case s: IntLongDenseVectorStorage => // 123
-            serArrBufSize[Long](s.getValues)
+            serArrBufSize(s.getValues)
 
           case s: IntFloatSortedVectorStorage => // 131
-            serArrBufSize[Int](s.getIndices) + serArrBufSize[Float](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: IntFloatSparseVectorStorage => // 132
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Int2FloatOpenHashMap]
             serFastMapBufSize(map)
           case s: IntFloatDenseVectorStorage => // 133
-            serArrBufSize[Float](s.getValues)
+            serArrBufSize(s.getValues)
 
           case s: IntDoubleSortedVectorStorage => // 141
-            serArrBufSize[Int](s.getIndices) + serArrBufSize[Double](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: IntDoubleSparseVectorStorage => // 142
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Int2DoubleOpenHashMap]
             serFastMapBufSize(map)
           case s: IntDoubleDenseVectorStorage => // 143
-            serArrBufSize[Double](s.getValues)
+            serArrBufSize(s.getValues)
 
           case s: LongIntSortedVectorStorage => // 211
-            serArrBufSize[Long](s.getIndices) + serArrBufSize[Int](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: LongIntSparseVectorStorage => // 212
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Long2IntOpenHashMap]
             serFastMapBufSize(map)
 
           case s: LongLongSortedVectorStorage => // 221
-            serArrBufSize[Long](s.getIndices) + serArrBufSize[Long](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: LongLongSparseVectorStorage => // 222
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Long2LongOpenHashMap]
             serFastMapBufSize(map)
 
           case s: LongFloatSortedVectorStorage => // 231
-            serArrBufSize[Long](s.getIndices) + serArrBufSize[Float](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: LongFloatSparseVectorStorage => // 232
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Long2FloatOpenHashMap]
             serFastMapBufSize(map)
 
           case s: LongDoubleSortedVectorStorage => // 241
-            serArrBufSize[Long](s.getIndices) + serArrBufSize[Double](s.getValues)
+            serArrBufSize(s.getIndices) + serArrBufSize(s.getValues)
           case s: LongDoubleSparseVectorStorage => // 242
             val map = ReflectUtils.field(s, "map").get
               .asInstanceOf[Long2DoubleOpenHashMap]
@@ -1571,10 +1539,10 @@ object SerDe {
       field.typeSignature match {
         case tpe if GUtils.isPrimitive(tpe) =>
           SerDe.serPrimitive(ReflectUtils.field(inst, field).get, byteBuf)
-        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+        case tpe if tpe <:< typeOf[Serialize] =>
           ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].serialize(byteBuf)
         case tpe if GUtils.isPrimitiveArray(tpe) =>
-          SerDe.serArr(tpe.typeArgs.head, ReflectUtils.field(inst, field).get, byteBuf)
+          SerDe.serArr(ReflectUtils.field(inst, field).get, byteBuf)
         case tpe if GUtils.isFastMap(tpe) =>
           SerDe.serFastMap(ReflectUtils.field(inst, field).get, byteBuf)
         case tpe if GUtils.isVector(tpe) =>
@@ -1606,7 +1574,7 @@ object SerDe {
         case tpe if GUtils.isPrimitive(tpe) =>
           ReflectUtils.field(inst, field)
             .set(SerDe.primitiveFromBuffer(tpe, byteBuf))
-        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+        case tpe if tpe <:< typeOf[Serialize] =>
           val node = ReflectUtils.newInstance(tpe).asInstanceOf[Serialize]
           node.deserialize(byteBuf)
           ReflectUtils.field(inst, field).set(node)
@@ -1647,10 +1615,10 @@ object SerDe {
       field.typeSignature match {
         case tpe if GUtils.isPrimitive(tpe) =>
           len += SerDe.serPrimitiveBufSize(ReflectUtils.field(inst, field).get)
-        case tpe if tpe.weak_<:<(typeOf[Serialize]) =>
+        case tpe if tpe <:< typeOf[Serialize] =>
           len += ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].bufferLen()
         case tpe if GUtils.isPrimitiveArray(tpe) =>
-          len += SerDe.serArrBufSize(tpe.typeArgs.head, ReflectUtils.field(inst, field).get)
+          len += SerDe.serArrBufSize(ReflectUtils.field(inst, field).get)
         case tpe if GUtils.isFastMap(tpe) =>
           len += SerDe.serFastMapBufSize(ReflectUtils.field(inst, field).get)
         case tpe if GUtils.isVector(tpe) =>

@@ -2,32 +2,40 @@ package com.tencent.angel.graph.core.psf.get
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.tencent.angel.graph.utils.SerDe
-import com.tencent.angel.ps.PSContext
+import com.tencent.angel.graph.core.psf.common.PSFGUCtx
+import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 
 import scala.reflect.runtime.universe._
 
+
 trait GetOp extends Serializable {
-  def apply(psContext: PSContext, mId: Int, pId: Int, tpe: Type, partParam: Any): (Type, Any)
+  def apply(pgParam: PSFGUCtx): (Type, Any)
 }
 
 
 object GetOp {
   private val ids = new AtomicInteger(0)
+  private val funcs = new Int2ObjectOpenHashMap[GetOp]()
   private val cache = new Int2ObjectOpenHashMap[Array[Byte]]()
 
-  def apply(func: (PSContext, Int, Int, Type, Any) => (Type, Any)): Int = {
-    val fId = ids.getAndIncrement()
+  def apply[U: TypeTag](func: PSFGUCtx => U): GetOp = {
 
-    val op = new GetOp with Serializable {
-      override def apply(psContext: PSContext, mId: Int, pId: Int, tpe: Type, partParam: Any): (Type, Any) = {
-        func(psContext, mId, pId, tpe, partParam)
+    new GetOp with Serializable {
+      override def apply(pgParam: PSFGUCtx): (Type, Any) = {
+        val result = func(pgParam)
+
+        ReflectUtils.getType(result) -> result
       }
     }
+  }
+
+  def add(getOp: GetOp): Int = {
+    val fId = ids.getAndIncrement()
 
     cache.synchronized {
-      cache.put(fId, SerDe.javaSer2Bytes(op))
+      funcs.put(fId, getOp)
+      cache.put(fId, SerDe.javaSer2Bytes(getOp))
     }
 
     fId
@@ -37,11 +45,15 @@ object GetOp {
     cache.get(fid)
   }
 
-  def remove(fId: Int): Unit = {
-    cache.synchronized {
-      if (cache.containsKey(fId)) {
-        cache.remove(fId)
-      }
+  def getOp(fid: Int): GetOp = {
+    funcs.get(fid)
+  }
+
+  def remove(fId: Int): Unit = cache.synchronized {
+    if (cache.containsKey(fId)) {
+      funcs.remove(fId)
+      cache.remove(fId)
     }
   }
+
 }

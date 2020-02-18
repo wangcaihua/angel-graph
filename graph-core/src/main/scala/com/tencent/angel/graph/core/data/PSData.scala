@@ -10,6 +10,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 
 import scala.collection.mutable
 
+import scala.reflect.runtime.universe._
+
 object PSData {
   private val nodeCache = new mutable.HashMap[(Int, Int), util.ArrayList[Any]]()
   private val refMapManagers = new mutable.HashMap[(Int, Int), RefHashMapManager]()
@@ -26,6 +28,11 @@ object PSData {
       case _ =>
         throw new Exception("Storage error")
     }
+  }
+
+  def toType[T: TypeTag](tpe: Type, value: Any): T = {
+    assert(tpe =:= typeOf[T])
+    value.asInstanceOf[T]
   }
 
   def initRefHashMapManager(ref: AnyRef, matrixId: Int, partitionId: Int): Unit = refMapManagers.synchronized {

@@ -11,9 +11,24 @@ import it.unimi.dsi.fastutil.longs._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
 
-class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
+class UpdatePSF(updateOp: UpdateOp) extends Serializable {
+  @transient private var updateFuncId: Int = -1
 
-  def batchUpdate[T: TypeTag](getParam: T, batchSize: Int): Unit = {
+  @transient private var matClient: MatrixClient = _
+  @transient private var hasBind: Boolean = false
+
+  def bind(matClient: MatrixClient): this.type = {
+    if (!hasBind) {
+      this.matClient = matClient
+      this.updateFuncId = UpdateOp.add(updateOp)
+
+      hasBind = true
+    }
+
+    this
+  }
+
+  def apply[T: TypeTag](getParam: T, batchSize: Int): Unit = {
     getParam match {
       case gParam: Array[Int] =>
         val size = gParam.length
@@ -64,14 +79,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getBooleanValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getBooleanValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getBooleanValue)
             }
           }
         }
@@ -86,14 +100,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getByteValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getByteValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getByteValue)
             }
           }
         }
@@ -108,14 +121,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getCharValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getCharValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getCharValue)
             }
           }
         }
@@ -130,14 +142,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getShortValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getShortValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getShortValue)
             }
           }
         }
@@ -152,14 +163,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getIntValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getIntValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getIntValue)
             }
           }
         }
@@ -174,14 +184,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getLongValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getLongValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getLongValue)
             }
           }
         }
@@ -196,14 +205,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getFloatValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getFloatValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getFloatValue)
             }
           }
         }
@@ -218,14 +226,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getDoubleValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getDoubleValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getDoubleValue)
             }
           }
         }
@@ -245,14 +252,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            put(entry.getIntKey, entry.getValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               clear()
-              put(entry.getIntKey, entry.getValue)
-            } else {
-              put(entry.getIntKey, entry.getValue)
             }
           }
         }
@@ -267,14 +273,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getBooleanValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getBooleanValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getBooleanValue)
             }
           }
         }
@@ -289,14 +294,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getByteValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getByteValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getByteValue)
             }
           }
         }
@@ -311,14 +315,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getCharValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getCharValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getCharValue)
             }
           }
         }
@@ -333,14 +336,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getShortValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getShortValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getShortValue)
             }
           }
         }
@@ -355,14 +357,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getIntValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getIntValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getIntValue)
             }
           }
         }
@@ -377,14 +378,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getLongValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getLongValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getLongValue)
             }
           }
         }
@@ -399,14 +399,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getFloatValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getFloatValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getFloatValue)
             }
           }
         }
@@ -421,14 +420,13 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getDoubleValue)
+
             if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
             } else if (curr % batchSize == 0) {
               this.apply(batchGParam.asInstanceOf[T])
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getDoubleValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getDoubleValue)
             }
           }
         }
@@ -448,14 +446,17 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            put(entry.getLongKey, entry.getValue)
+
             if (curr == size) {
+              println(s"${Thread.currentThread().getId}: before  batch $curr")
               this.apply(batchGParam.asInstanceOf[T])
+              println(s"${Thread.currentThread().getId}: after  batch $curr")
             } else if (curr % batchSize == 0) {
+              println(s"${Thread.currentThread().getId}: before  batch $curr")
               this.apply(batchGParam.asInstanceOf[T])
+              println(s"${Thread.currentThread().getId}: after  batch $curr")
               clear()
-              put(entry.getLongKey, entry.getValue)
-            } else {
-              put(entry.getLongKey, entry.getValue)
             }
           }
         }
@@ -464,9 +465,12 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
     }
   }
 
-  def apply[T: TypeTag](updateParam: T): Unit = asyncUpdate[T](updateParam).get
+  def apply[T: TypeTag](updateParam: T): Unit = async[T](updateParam).get
 
-  def asyncUpdate[T: TypeTag](updateParam: T): Future[VoidResult] = {
+  def async[T: TypeTag](updateParam: T): Future[VoidResult] = {
+    if (!hasBind) {
+      throw new Exception("please init bind a matClient first!")
+    }
     assert(GUtils.paramCheck(typeOf[T]))
 
     val param = GUpdateParam[T](matClient.getMatrixId, updateParam, updateFuncId)
@@ -474,14 +478,24 @@ class UpdatePSF(matClient: MatrixClient, updateFuncId: Int) {
     matClient.asyncUpdate(func)
   }
 
-  def apply(): Unit = asyncUpdate().get
+  def apply(): Unit = async().get
 
-  def asyncUpdate(): Future[VoidResult] = {
+  def async(): Future[VoidResult] = {
+    if (!hasBind) {
+      throw new Exception("please init bind a matClient first!")
+    }
+
     val param = GUpdateParam.empty(matClient.getMatrixId, updateFuncId)
     val func = new GUpdateFunc(param)
     matClient.asyncUpdate(func)
   }
 
-  def removeFuncIds(): Unit = UpdateOp.remove(updateFuncId)
+  def clear(): Unit = {
+    UpdateOp.remove(updateFuncId)
+
+    updateFuncId = -1
+    matClient = null
+    hasBind = false
+  }
 }
 

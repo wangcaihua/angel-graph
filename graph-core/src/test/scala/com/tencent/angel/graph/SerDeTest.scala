@@ -1,6 +1,5 @@
 package com.tencent.angel.graph
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
 import com.tencent.angel.ml.math2.VFactory
@@ -194,7 +193,7 @@ class SerDeTest extends AnyFunSuite {
     allVectors.foreach{ vec => SerDe.serVector(vec, directBuf)}
 
     allVectors.foreach{ vec =>
-      val tpe = ReflectUtils.getType(vec)
+      val tpe = ReflectUtils.typeFromObject(vec)
       val desered = SerDe.vectorFromBuffer(tpe, directBuf)
     }
 

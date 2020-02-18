@@ -22,7 +22,7 @@ object ResultSerDe {
     if (GUtils.isPrimitive(tpe)) {
       SerDe.serPrimitive(params, buf)
     } else if (GUtils.isPrimitiveArray(tpe)) {
-      SerDe.serArr(tpe.typeArgs.head, params, buf)
+      SerDe.serArr(params, buf)
     } else if (GUtils.isFastMap(tpe)) {
       SerDe.serFastMap(params, buf)
     } else if (GUtils.isVector(tpe)) {
@@ -39,7 +39,7 @@ object ResultSerDe {
   }
 
   def deserialize(buf: ByteBuf): (Type, Any) = {
-    val tpe = ReflectUtils.getType(SerDe.primitiveFromBuffer[String](buf))
+    val tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](buf))
 
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)

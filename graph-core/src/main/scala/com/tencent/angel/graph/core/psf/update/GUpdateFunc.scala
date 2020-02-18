@@ -1,5 +1,6 @@
 package com.tencent.angel.graph.core.psf.update
 
+import com.tencent.angel.graph.core.psf.common.PSFGUCtx
 import com.tencent.angel.ml.matrix.psf.update.base._
 import com.tencent.angel.ps.storage.vector.ServerRow
 
@@ -10,11 +11,12 @@ class GUpdateFunc(uParam: UpdateParam) extends UpdateFunc(uParam) {
     val pp = partitionUpdateParam.asInstanceOf[GPartitionUpdateParam]
     val row: ServerRow = psContext.getMatrixStorageManager.getRow(
       pp.getMatrixId, 0, pp.getPartKey.getPartitionId)
-    val op: UpdateOp = pp.operation.asInstanceOf[UpdateOp]
+    val updateOp: UpdateOp = pp.operation.asInstanceOf[UpdateOp]
 
     row.startWrite()
     try {
-      op(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
+      val puParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
+      updateOp(puParam)
     } finally {
       row.endWrite()
     }

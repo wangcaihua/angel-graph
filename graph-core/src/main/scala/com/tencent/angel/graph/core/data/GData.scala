@@ -31,7 +31,7 @@ object GData {
     if (types.contains(name)) {
       types(name)
     } else {
-      val tpe = ReflectUtils.getType(node)
+      val tpe = ReflectUtils.typeFromObject(node)
       types.put(name, tpe)
 
       tpe
@@ -44,7 +44,7 @@ object GData {
     if (fields.contains(name)) {
       fields(name)
     } else {
-      val field = ReflectUtils.getFields(ReflectUtils.getType(node))
+      val field = ReflectUtils.getFields(ReflectUtils.typeFromObject(node))
       fields.put(name, field)
 
       field

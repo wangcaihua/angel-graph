@@ -135,14 +135,14 @@ case class NodeTNW(tpe: Int, neighs: Int2ObjectOpenHashMap[Array[VertexId]],
 
 
 object ANode {
-  def apply(neighs: Array[VertexId]): ANode = NodeN(neighs)
+  def apply(neighs: Array[VertexId]): NodeN = NodeN(neighs)
 
-  def apply(neighs: Array[VertexId], weights: Array[WgtTpe]): ANode = NodeNW(neighs, weights)
+  def apply(neighs: Array[VertexId], weights: Array[WgtTpe]): NodeNW = NodeNW(neighs, weights)
 
-  def apply(tpe: Int, neighs: Int2ObjectOpenHashMap[Array[VertexId]]): ANode = NodeTN(tpe, neighs)
+  def apply(tpe: Int, neighs: Int2ObjectOpenHashMap[Array[VertexId]]): NodeTN = NodeTN(tpe, neighs)
 
   def apply(tpe: Int, neighs: Int2ObjectOpenHashMap[Array[VertexId]],
-            weights: Int2ObjectOpenHashMap[Array[WgtTpe]]): ANode = NodeTNW(tpe, neighs, weights)
+            weights: Int2ObjectOpenHashMap[Array[WgtTpe]]): NodeTNW = NodeTNW(tpe, neighs, weights)
 
 
   def unapply(arg: NodeN): Option[Array[VertexId]] = {

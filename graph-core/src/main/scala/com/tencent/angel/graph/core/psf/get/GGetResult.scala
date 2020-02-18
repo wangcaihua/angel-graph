@@ -18,7 +18,7 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
 
     tpe match {
       case t if GUtils.isPrimitive(t) => SerDe.serPrimitive(pResult, byteBuf)
-      case t if GUtils.isPrimitiveArray(t) => SerDe.serArr(t.typeArgs.head, pResult, byteBuf)
+      case t if GUtils.isPrimitiveArray(t) => SerDe.serArr(pResult, byteBuf)
       case t if GUtils.isFastMap(t) => SerDe.serFastMap(pResult, byteBuf)
       case t if GUtils.isVector(t) => SerDe.serVector(pResult.asInstanceOf[Vector], byteBuf)
       case _ => SerDe.serialize(pResult, ReflectUtils.getFields(tpe), byteBuf)
@@ -43,7 +43,7 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
   }
 
   override def deserialize(byteBuf: ByteBuf): Unit = {
-    tpe = ReflectUtils.getType(SerDe.primitiveFromBuffer[String](byteBuf))
+    tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](byteBuf))
 
     tpe match {
       case t if GUtils.isPrimitive(t) =>

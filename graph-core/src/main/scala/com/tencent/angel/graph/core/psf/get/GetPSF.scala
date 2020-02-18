@@ -12,9 +12,25 @@ import it.unimi.dsi.fastutil.longs._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
 
-class GetPSF[U](matClient: MatrixClient, getFuncId: Int, mergeFuncId: Int) {
+class GetPSF[U](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
+  @transient private var getFuncId: Int = -1
+  @transient private var mergeFuncId: Int = -1
 
-  def batchGet[T: TypeTag](getParam: T, mergeParam: U, batchSize: Int): U = {
+  @transient private var matClient: MatrixClient = _
+  @transient private var hasBind: Boolean = false
+
+  def bind(matClient: MatrixClient): this.type = this.synchronized {
+    if (!hasBind) {
+      this.matClient = matClient
+      this.getFuncId = GetOp.add(getOp)
+      this.mergeFuncId = MergeOp.add(mergeOp)
+
+      hasBind = true
+    }
+    this
+  }
+
+  def apply[T: TypeTag](getParam: T, mergeParam: U, batchSize: Int): U = {
     var result: U = mergeParam
 
     getParam match {
@@ -469,7 +485,10 @@ class GetPSF[U](matClient: MatrixClient, getFuncId: Int, mergeFuncId: Int) {
     result
   }
 
-  def asyncGet[T: TypeTag](getParam: T, mergeParam: U): Future[GetResult] = {
+  def asyncGet[T: TypeTag](getParam: T, mergeParam: U): Future[GetResult] = this.synchronized {
+    if (!hasBind) {
+      throw new Exception("please init bind a matClient first!")
+    }
     assert(GUtils.paramCheck(typeOf[T]))
 
     val initId = GetPSF.setInit(mergeParam)
@@ -483,7 +502,11 @@ class GetPSF[U](matClient: MatrixClient, getFuncId: Int, mergeFuncId: Int) {
 
   def apply[T: TypeTag](getParam: T, mergeParam: U): U = GetPSF.getResult[U](asyncGet(getParam, mergeParam))
 
-  def asyncGet(mergeParam: U): Future[GetResult] = {
+  def asyncGet(mergeParam: U): Future[GetResult] = this.synchronized {
+    if (!hasBind) {
+      throw new Exception("please init bind a matClient first!")
+    }
+
     val initId = GetPSF.setInit(mergeParam)
     val param = GGetParam.empty(matClient.getMatrixId, getFuncId, mergeFuncId, initId)
     val func = new GGetFunc(param)
@@ -495,9 +518,14 @@ class GetPSF[U](matClient: MatrixClient, getFuncId: Int, mergeFuncId: Int) {
 
   def apply(mergeParam: U): U = GetPSF.getResult[U](asyncGet(mergeParam))
 
-  def removeFuncIds(): Unit = {
+  def clear(): Unit = this.synchronized {
     GetOp.remove(getFuncId)
     MergeOp.remove(mergeFuncId)
+
+    getFuncId = -1
+    mergeFuncId = -1
+    matClient = null
+    hasBind = false
   }
 }
 

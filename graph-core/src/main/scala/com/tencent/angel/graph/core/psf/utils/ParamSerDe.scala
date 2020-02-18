@@ -37,7 +37,7 @@ object ParamSerDe {
   }
 
   def deserializeSplit(buf: ByteBuf): (Type, Any) = {
-    val tpe = ReflectUtils.getType(SerDe.primitiveFromBuffer[String](buf))
+    val tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](buf))
 
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)

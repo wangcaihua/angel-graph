@@ -1,13 +1,12 @@
 package com.tencent.angel.graph.utils
 
+import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx}
 import com.tencent.angel.graph.core.psf.get._
-import com.tencent.angel.graph.core.psf.update.{UpdateOp, UpdatePSF}
-import com.tencent.angel.ps
+import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.psagent.matrix.{MatrixClient, MatrixClientFactory}
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.models.PSMatrix
 import org.apache.spark.TaskContext
-import org.apache.spark.compat.CUtils
 
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
@@ -25,25 +24,15 @@ class PSFGen(psMat: PSMatrix) {
 object psfConverters {
 
   implicit class GetPSFGen(psMatrix: PSMatrix) extends PSFGen(psMatrix) {
-    def createGet[U](getFunc: (ps.PSContext, Int, Int, Type, Any) => (Type, Any))
-                    (mergeFunc: (Type, Any, Any) => Any): GetPSF[U] = {
-      val cleanedGetFunc = CUtils.clean(getFunc)
-
-      val getFuncId = GetOp(cleanedGetFunc)
-      val mergeFuncId = MergeOp(mergeFunc)
-
-      new GetPSF[U](matClient, getFuncId, mergeFuncId)
+    def createGet[U](getFunc: PSFGUCtx => (Type, Any))
+                    (mergeFunc: PSFMCtx => Any): GetPSF[U] = {
+      PSFUtils.createGet[U](getFunc)(mergeFunc).bind(matClient)
     }
-
   }
 
   implicit class UpdatePSFGen(psMatrix: PSMatrix) extends PSFGen(psMatrix) {
-    def createUpdate(updateFunc: (ps.PSContext, Int, Int, Type, Any) => Unit): Unit = {
-      val cleanedUpdateFunc = CUtils.clean(updateFunc)
-
-      val updateFuncId = UpdateOp(cleanedUpdateFunc)
-
-      new UpdatePSF(matClient, updateFuncId)
+    def createUpdate(updateFunc: PSFGUCtx => Unit): UpdatePSF = {
+      PSFUtils.createUpdate(updateFunc).bind(matClient)
     }
   }
 
