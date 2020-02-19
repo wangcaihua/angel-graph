@@ -9,7 +9,7 @@ import scala.reflect.runtime.universe._
 
 object PSFUtils {
   def createGet[U: TypeTag](getFunc: PSFGUCtx => U)
-                           (mergeFunc: PSFMCtx => Any): GetPSF[U] = {
+                           (mergeFunc: PSFMCtx => U): GetPSF[U] = {
     val cleanedGetFunc = CUtils.clean(getFunc)
 
     val getOp = GetOp(cleanedGetFunc)

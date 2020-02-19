@@ -49,7 +49,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
         (0 until parts.size()).foreach { idx =>
           val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), tpe, params,
             getFuncId, mergeFuncId, initId)
-          splits.set(idx, pp)
+          splits.add(pp)
         }
 
         splits
@@ -65,7 +65,7 @@ object GGetParam {
     new GGetParam[Byte](mId, 0.toByte, getFuncId, mergeFuncId, initId)
   }
 
-  def apply[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int, initId: Int) = {
+  def apply[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int, initId: Int): GGetParam[T] = {
     new GGetParam[T](mId, params, getFuncId, mergeFuncId, initId)
   }
 }

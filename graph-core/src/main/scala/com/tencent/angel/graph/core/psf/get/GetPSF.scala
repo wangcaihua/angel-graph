@@ -85,14 +85,12 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getBooleanValue)
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getBooleanValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getBooleanValue)
             }
           }
         }
@@ -107,14 +105,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getByteValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getByteValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getByteValue)
             }
           }
         }
@@ -129,14 +126,12 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getCharValue)
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getCharValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getCharValue)
             }
           }
         }
@@ -151,14 +146,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getShortValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getShortValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getShortValue)
             }
           }
         }
@@ -173,14 +167,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getIntValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getIntValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getIntValue)
             }
           }
         }
@@ -195,14 +188,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+
+            batchGParam.put(entry.getIntKey, entry.getLongValue)
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getLongValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getLongValue)
             }
           }
         }
@@ -217,13 +209,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getFloatValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getFloatValue)
-            } else {
               batchGParam.put(entry.getIntKey, entry.getFloatValue)
             }
           }
@@ -239,14 +231,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getIntKey, entry.getDoubleValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getIntKey, entry.getDoubleValue)
-            } else {
-              batchGParam.put(entry.getIntKey, entry.getDoubleValue)
             }
           }
         }
@@ -266,13 +257,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            put(entry.getIntKey, entry.getValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               clear()
-              put(entry.getIntKey, entry.getValue)
-            } else {
               put(entry.getIntKey, entry.getValue)
             }
           }
@@ -288,14 +279,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getBooleanValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getBooleanValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getBooleanValue)
             }
           }
         }
@@ -310,14 +300,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getByteValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getByteValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getByteValue)
             }
           }
         }
@@ -332,14 +321,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getCharValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getCharValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getCharValue)
             }
           }
         }
@@ -354,14 +342,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getShortValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getShortValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getShortValue)
             }
           }
         }
@@ -376,14 +363,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getIntValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getIntValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getIntValue)
             }
           }
         }
@@ -398,14 +384,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getLongValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getLongValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getLongValue)
             }
           }
         }
@@ -420,14 +405,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getFloatValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getFloatValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getFloatValue)
             }
           }
         }
@@ -442,14 +426,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            batchGParam.put(entry.getLongKey, entry.getDoubleValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               batchGParam.clear()
-              batchGParam.put(entry.getLongKey, entry.getDoubleValue)
-            } else {
-              batchGParam.put(entry.getLongKey, entry.getDoubleValue)
             }
           }
         }
@@ -469,14 +452,13 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
           while (iter.hasNext) {
             curr += 1
             val entry = iter.next()
+            put(entry.getLongKey, entry.getValue)
+
             if (curr == size) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
             } else if (curr % batchSize == 0) {
               result = this.apply(batchGParam.asInstanceOf[T], result)
               clear()
-              put(entry.getLongKey, entry.getValue)
-            } else {
-              put(entry.getLongKey, entry.getValue)
             }
           }
         }
@@ -487,7 +469,7 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
     result
   }
 
-  def asyncGet[T: TypeTag](getParam: T, mergeParam: U): Future[GetResult] = this.synchronized {
+  def asyncGet[T: TypeTag](getParam: T, mergeParam: U): (Future[GetResult], Int) = this.synchronized {
     if (!hasBind) {
       throw new Exception("please init bind a matClient first!")
     }
@@ -497,14 +479,16 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
     val param = GGetParam[T](matClient.getMatrixId, getParam, getFuncId, mergeFuncId, initId)
     val func = new GGetFunc(param)
     val result = matClient.asyncGet(func)
-    GetPSF.removeInit(initId)
+    // GetPSF.removeInit(initId)
 
-    result
+    result -> initId
   }
 
-  def apply[T: TypeTag](getParam: T, mergeParam: U): U = GetPSF.getResult[U](asyncGet(getParam, mergeParam))
+  def apply[T: TypeTag](getParam: T, mergeParam: U): U = {
+    GetPSF.getResult[U](asyncGet(getParam, mergeParam))
+  }
 
-  def asyncGet(mergeParam: U): Future[GetResult] = this.synchronized {
+  def asyncGet(mergeParam: U): (Future[GetResult], Int) = this.synchronized {
     if (!hasBind) {
       throw new Exception("please init bind a matClient first!")
     }
@@ -513,12 +497,14 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
     val param = GGetParam.empty(matClient.getMatrixId, getFuncId, mergeFuncId, initId)
     val func = new GGetFunc(param)
     val result = matClient.asyncGet(func)
-    GetPSF.removeInit(initId)
+    //GetPSF.removeInit(initId)
 
-    result
+    result -> initId
   }
 
-  def apply(mergeParam: U): U = GetPSF.getResult[U](asyncGet(mergeParam))
+  def apply(mergeParam: U): U = {
+    GetPSF.getResult[U](asyncGet(mergeParam))
+  }
 
   def clear(): Unit = this.synchronized {
     GetOp.remove(getFuncId)
@@ -535,8 +521,11 @@ object GetPSF {
   private val ids = new AtomicInteger(0)
   private val inits = new Int2ObjectOpenHashMap[Any]()
 
-  def getResult[U](res: Future[GetResult]): U = {
-    res.get().asInstanceOf[GGetResult].value.asInstanceOf[U]
+  def getResult[U](future: (Future[GetResult], Int)): U = {
+    val result = future._1.get().asInstanceOf[GGetResult].value.asInstanceOf[U]
+    GetPSF.removeInit(future._2)
+
+    result
   }
 
   def setInit(init: Any): Int = inits.synchronized {

@@ -25,7 +25,7 @@ object psfConverters {
 
   implicit class GetPSFGen(psMatrix: PSMatrix) extends PSFGen(psMatrix) {
     def createGet[U: TypeTag](getFunc: PSFGUCtx => U)
-                    (mergeFunc: PSFMCtx => Any): GetPSF[U] = {
+                             (mergeFunc: PSFMCtx => U): GetPSF[U] = {
       PSFUtils.createGet[U](getFunc)(mergeFunc).bind(matClient)
     }
   }
