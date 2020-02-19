@@ -28,20 +28,6 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
     byteBuf.writeInt(initId)
   }
 
-  override def bufferLen(): Int = {
-    val tpeLen = SerDe.serPrimitiveBufSize(tpe.toString)
-
-    val dataLen = tpe match {
-      case t if GUtils.isPrimitive(t) => SerDe.serPrimitiveBufSize(pResult)
-      case t if GUtils.isPrimitiveArray(t) => SerDe.serArrBufSize(t.typeArgs.head, pResult)
-      case t if GUtils.isFastMap(t) => SerDe.serFastMapBufSize(pResult)
-      case t if GUtils.isVector(t) => SerDe.serVectorBufSize(pResult.asInstanceOf[Vector])
-      case t => SerDe.bufferLen(pResult, ReflectUtils.getFields(t))
-    }
-
-    tpeLen + dataLen + 8
-  }
-
   override def deserialize(byteBuf: ByteBuf): Unit = {
     tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](byteBuf))
 
@@ -61,5 +47,19 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
 
     mergeFuncId = byteBuf.readInt()
     initId = byteBuf.readInt()
+  }
+
+  override def bufferLen(): Int = {
+    val tpeLen = SerDe.serPrimitiveBufSize(tpe.toString)
+
+    val dataLen = tpe match {
+      case t if GUtils.isPrimitive(t) => SerDe.serPrimitiveBufSize(pResult)
+      case t if GUtils.isPrimitiveArray(t) => SerDe.serArrBufSize(t.typeArgs.head, pResult)
+      case t if GUtils.isFastMap(t) => SerDe.serFastMapBufSize(pResult)
+      case t if GUtils.isVector(t) => SerDe.serVectorBufSize(pResult.asInstanceOf[Vector])
+      case t => SerDe.bufferLen(pResult, ReflectUtils.getFields(t))
+    }
+
+    tpeLen + dataLen + 8
   }
 }

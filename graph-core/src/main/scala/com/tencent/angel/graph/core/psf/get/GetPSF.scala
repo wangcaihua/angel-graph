@@ -12,12 +12,14 @@ import it.unimi.dsi.fastutil.longs._
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._
 
-class GetPSF[U](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
+class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
   @transient private var getFuncId: Int = -1
   @transient private var mergeFuncId: Int = -1
 
   @transient private var matClient: MatrixClient = _
   @transient private var hasBind: Boolean = false
+
+  ReflectUtils.registerType(typeOf[U])
 
   def bind(matClient: MatrixClient): this.type = this.synchronized {
     if (!hasBind) {

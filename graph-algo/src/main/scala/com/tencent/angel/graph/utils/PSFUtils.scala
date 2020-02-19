@@ -8,8 +8,8 @@ import org.apache.spark.compat.CUtils
 import scala.reflect.runtime.universe._
 
 object PSFUtils {
-  def createGet[U](getFunc: PSFGUCtx => (Type, Any))
-                  (mergeFunc: PSFMCtx => Any): GetPSF[U] = {
+  def createGet[U: TypeTag](getFunc: PSFGUCtx => U)
+                           (mergeFunc: PSFMCtx => Any): GetPSF[U] = {
     val cleanedGetFunc = CUtils.clean(getFunc)
 
     val getOp = GetOp(cleanedGetFunc)

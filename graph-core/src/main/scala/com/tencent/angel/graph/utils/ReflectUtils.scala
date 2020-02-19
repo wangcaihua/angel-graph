@@ -496,6 +496,13 @@ object ReflectUtils {
     }
   }
 
+  def registerType(tpe: Type): Unit = typeCache.synchronized {
+    val name = tpe.toString
+    if (!typeCache.containsKey(name)) {
+      typeCache.put(name, tpe)
+    }
+  }
+
   def getFields(tpe: Type): List[TermSymbol] = {
     val buf = new ListBuffer[TermSymbol]()
     tpe.members.foreach {
