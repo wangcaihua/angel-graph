@@ -13,28 +13,34 @@ class FastHashSet[@spec(Int, Long) T: ClassTag](expected: Int, f: Float) extends
   private var n: Int = arraySize(expected, f)
   private var mask: Int = n - 1
   private var maxFill: Int = calMaxFill(n, f)
-  var size: Int = 0
+  private var minN: Int = n
+  private var numElements: Int = 0
+
+  private lazy val keyTag = implicitly[ClassTag[T]].runtimeClass
+  private lazy val nullKey: T = keyTag match {
+    case kt if kt == classOf[Int] => 0.asInstanceOf[T]
+    case kt if kt == classOf[Long] => 0.toLong.asInstanceOf[T]
+  }
+
   data = new Array[T](n + 1)
 
-  private val nullKey: T = classTag[T] match {
-    case kt if kt == ClassTag.Int => 0.asInstanceOf[T]
-    case kt if kt == ClassTag.Long => 0L.asInstanceOf[T]
-  }
-
-  private val hash: Hasher[T] = classTag[T] match {
-    case kt if kt == ClassTag.Long =>
+  private lazy val hash: Hasher[T] = {
+    if (keyTag == classOf[Long]) {
       (new LongHasher).asInstanceOf[Hasher[T]]
-    case kt if kt == ClassTag.Int =>
+    } else if (keyTag == classOf[Int]) {
       (new IntHasher).asInstanceOf[Hasher[T]]
-    case _ =>
+    } else {
       new Hasher[T]
+    }
   }
 
-  def this(initCapacity: Int) = this(initCapacity, 0.7f)
+  def this(initCapacity: Int) = this(initCapacity, HashCommon.DEFAULT_LOAD_FACTOR)
 
-  def this() = this(64)
+  def this() = this(HashCommon.DEFAULT_INITIAL_SIZE, HashCommon.DEFAULT_LOAD_FACTOR)
 
-  private def realSize: Int = if (containsNullKey) size - 1 else size
+  def size(): Int = numElements
+
+  private def realSize: Int = if (containsNullKey) numElements - 1 else numElements
 
   private def getPos(key: T): Int = {
     if (key == 0) {
@@ -58,38 +64,111 @@ class FastHashSet[@spec(Int, Long) T: ClassTag](expected: Int, f: Float) extends
 
   private def rehash(newN: Int) {
     val newMask: Int = newN - 1 // Note that this is used by the hashing macro
-    val newData: Array[T] = new Array[T](newN + 1)
+    val newKeys: Array[T] = new Array[T](newN + 1)
 
-    var (i: Int, pos: Int, j: Int) = (n - 1, 0, realSize)
-    while (j != 0) {
-      while (data(i) == 0) {
+    var (i: Int, pos: Int, j: Int) = (n, 0, realSize)
+    while (j > 0) {
+      i -= 1
+      while (i >= 0 && data(i) == 0) {
         i -= 1
       }
 
       pos = hash(data(i)) & newMask
-      while (newData(pos) != 0) {
+      if (newKeys(pos) != 0) {
         pos = (pos + 1) & newMask
+        while (newKeys(pos) != 0) {
+          pos = (pos + 1) & newMask
+        }
       }
 
-      newData(pos) = data(i)
+      newKeys(pos) = data(i)
 
       j -= 1
     }
 
     this.n = newN
-    this.mask = n - 1
-    this.maxFill = calMaxFill(n, f)
-    this.data = newData
+    this.mask = newN - 1
+    this.maxFill = calMaxFill(newN, f)
+    this.data = newKeys
   }
 
   private def insert(pos: Int, k: T) {
     if (pos == n) containsNullKey = true
     data(pos) = k
-    size += 1
-    if (size >= maxFill) rehash(arraySize(size + 1, f))
+    numElements += 1
+    if (numElements - 1 >= maxFill) {
+      rehash(arraySize(numElements + 1, f))
+    }
   }
 
-  def contains(k: T): Boolean = getPos(k) >= 0
+  private def removeNullEntry(): Unit = {
+    containsNullKey = false
+    numElements -= 1
+    if (n > minN && numElements < maxFill / 4 && n > DEFAULT_INITIAL_SIZE)
+      rehash(n / 2)
+  }
+
+  private def shiftKeys(p: Int): Unit = {
+    var (last, slot, curr, pos) = (0, 0, nullKey, p)
+    while (true) {
+      last = pos
+      pos = (pos + 1) & mask
+      var flag = true
+      while(flag) {
+        curr = data(pos)
+        if (curr == 0) {
+          data(last) = nullKey
+          return
+        }
+
+        slot = hash(curr) & mask
+        val tmp = if (last <= pos) last >= slot || slot > pos else last >= slot && slot > pos
+        if (tmp) {
+          flag = false
+        } else {
+          pos = (pos + 1) & mask
+        }
+      }
+
+      data(last) = curr
+    }
+  }
+
+  private def removeEntry(pos: Int): Unit = {
+    numElements -= 1
+    shiftKeys(pos)
+    if (n > minN && numElements < maxFill / 4 && n > DEFAULT_INITIAL_SIZE)
+      rehash(n / 2)
+  }
+
+  def contains(k: T): Boolean = {
+    var contain = false
+
+    if (k == 0) {
+      if (containsNullKey) {
+        contain = true
+      }
+    } else {
+      var pos = hash(k) & mask
+      var curr = data(pos)
+      var flag = false
+
+      while (!flag) {
+        if (curr == 0) {
+          contain = false
+          flag = true
+        } else if (curr == k) {
+          contain = true
+          flag = true
+        } else {
+          pos = (pos + 1) & mask
+          curr = data(pos)
+        }
+      }
+    }
+
+    contain
+  }
 
   def getBitSet: BitSet = {
     val bitSet = new BitSet(n + 1)
@@ -120,21 +199,33 @@ class FastHashSet[@spec(Int, Long) T: ClassTag](expected: Int, f: Float) extends
   }
 
   def remove(k: T): this.type = {
-    val pos = getPos(k)
-
-    if (pos >= 0 && pos != n) {
-      data(pos) = nullKey
-    } else if (pos == n) {
-      containsNullKey = false
+    if (k == 0) {
+      if (containsNullKey) {
+        removeNullEntry()
+      }
     } else {
-      throw new Exception(s"Cannot find key $k")
+      var pos = hash(k) & mask
+      var curr = data(pos)
+      var flag = false
+
+      while (!flag) {
+        if (curr == 0) {
+          flag = true
+        } else if (curr == k) {
+          removeEntry(pos)
+          flag = true
+        } else {
+          pos = (pos + 1) & mask
+          curr = data(pos)
+        }
+      }
     }
 
     this
   }
 
   def clear(): this.type = {
-    size = 0
+    numElements = 0
     var pos = 0
     while (pos < n) {
       if (data(pos) != 0) {
@@ -172,7 +263,7 @@ class FastHashSet[@spec(Int, Long) T: ClassTag](expected: Int, f: Float) extends
     if (pos >= 0) {
       data(pos) = k
     } else if (-pos - 1 < n) {
-      size += 1
+      numElements += 1
       data(-pos - 1) = k
     } else {
       throw new Exception("addWithoutResize error, data full!")

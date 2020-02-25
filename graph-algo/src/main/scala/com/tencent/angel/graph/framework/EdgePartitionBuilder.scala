@@ -46,35 +46,26 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
     val local2global = new FastArray[VertexId]
     var vertexAttrs = Array.empty[VD]
 
+    def mergeFunc(v1: (Int, Int), v2: (Int, Int)): (Int, Int) = {
+      val x1 = if (v1._1 < v2._1) v1._1 else v1._1
+      val x2 = v1._2 + v2._2
+
+      x1 -> x2
+    }
+
     if (edgeDirection == EdgeDirection.Out) {
       new Sorter(Edge.sortDataFormat[ED])
         .sort(edgeArray, 0, edgeArray.length, Edge.srcOrdering[ED])
 
-      var (key, start, len) = (edgeArray.head.srcId, 0, 0)
       edgeArray.zipWithIndex.foreach { case (edge, idx) =>
-        if (edge.srcId == key) {
-          len += 1
-        } else {
-          index.put(key, (start, len))
-          key = edge.srcId
-          start = idx
-          len = 1
-        }
+        index.putMerge(edge.srcId, (idx, 1), mergeFunc)
       }
     } else if (edgeDirection == EdgeDirection.In) {
       new Sorter(Edge.sortDataFormat[ED])
         .sort(edgeArray, 0, edgeArray.length, Edge.dstOrdering[ED])
 
-      var (key, start, len) = (edgeArray.head.dstId, 0, 0)
       edgeArray.zipWithIndex.foreach { case (edge, idx) =>
-        if (edge.dstId == key) {
-          len += 1
-        } else {
-          index.put(key, (start, len))
-          key = edge.dstId
-          start = idx
-          len = 1
-        }
+        index.putMerge(edge.dstId, (idx, 1), mergeFunc)
       }
     } else if (edgeDirection == EdgeDirection.Both) {
       val vertexHist = Edge.vertexHist(edgeArray)
@@ -96,32 +87,23 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
         }
       }
 
-      var (key, start, len) = (orderKey(edgeArray.head), 0, 0)
       edgeArray.zipWithIndex.foreach { case (edge, idx) =>
         val currKey = orderKey(edge)
-        if (currKey == key) {
-          len += 1
-        } else {
-          index.put(key, (start, len))
-          key = currKey
-          start = idx
-          len = 1
+        index.putMerge(currKey, (idx, 1), mergeFunc)
+      }
+      /*
+      index.foreach{ case (id, (start, len)) =>
+        (0 until len).foreach{ idx =>
+          assert(id == orderKey(edgeArray(start + idx)))
         }
       }
+       */
     } else {
       new Sorter(Edge.sortDataFormat[ED])
         .sort(edgeArray, 0, edgeArray.length, Edge.srcOrdering[ED])
 
-      var (key, start, len) = (edgeArray.head.srcId, 0, 0)
       edgeArray.zipWithIndex.foreach { case (edge, idx) =>
-        if (edge.srcId == key) {
-          len += 1
-        } else {
-          index.put(key, (start, len))
-          key = edge.srcId
-          start = idx
-          len = 1
-        }
+        index.putMerge(edge.srcId, (idx, 1), mergeFunc)
       }
     }
 

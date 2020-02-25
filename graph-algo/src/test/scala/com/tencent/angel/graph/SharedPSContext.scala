@@ -4,29 +4,17 @@ import com.tencent.angel.ml.matrix.{MatrixContext, RowType}
 import com.tencent.angel.ps.storage.vector.element.IElement
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.models.PSMatrix
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.{SparkConf, SparkContext}
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
+import org.apache.spark.SparkConf
+import org.scalatest.{BeforeAndAfterEach, Suite}
 
-trait SharedPSContext extends BeforeAndAfterAll with BeforeAndAfterEach {
+trait SharedPSContext extends WithSpark with BeforeAndAfterEach {
   self: Suite =>
-
-  @transient private var _spark: SparkSession = _
 
   def doubleEps: Double = 1e-6
 
-  def spark: SparkSession = _spark
+  override def getMoreConf(conf: SparkConf): SparkConf = {
 
-  def sc: SparkContext = _spark.sparkContext
-
-  var conf = new SparkConf(false)
-
-  override def beforeAll() {
-    super.beforeAll()
-
-    // Angel config
-    val psConf = new SparkConf()
-      .set("spark.ps.mode", "LOCAL")
+    conf.set("spark.ps.mode", "LOCAL")
       .set("spark.ps.jars", "None")
       .set("spark.ps.tmp.path", "file:///tmp/stage")
       .set("spark.ps.out.path", "file:///tmp/output")
@@ -35,28 +23,19 @@ trait SharedPSContext extends BeforeAndAfterAll with BeforeAndAfterEach {
       .set("spark.ps.cores", "1")
       .set("spark.ps.out.tmp.path.prefix", "/E://temp")
 
-    // Spark setup
-    val builder = SparkSession.builder()
-      .master("local[4]")
-      .appName("test")
-      .config(psConf)
-      .config(conf)
+    conf
+  }
 
-    _spark = builder.getOrCreate()
-    sc.setLogLevel("ERROR")
+  override def beforeAll(): Unit = {
+    super.beforeAll()
 
     // PS setup
     PSContext.getOrCreate(sc)
   }
 
-  override def afterAll() {
-    try {
-      PSContext.stop()
-      _spark.stop()
-      _spark = null
-    } finally {
-      super.afterAll()
-    }
+  override def afterAll(): Unit = {
+    PSContext.stop()
+    super.afterAll()
   }
 
   protected override def beforeEach(): Unit = {

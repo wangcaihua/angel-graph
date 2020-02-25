@@ -6,7 +6,9 @@ import com.tencent.angel.graph.utils.{FastHashMap, SortDataFormat}
 import scala.{specialized => spec}
 
 class Edge[@spec(Int, Long, Float, Double) ED](val srcId: VertexId, val dstId: VertexId, val attr: ED)
-  extends Serializable
+  extends Serializable {
+  override def toString: String = s"$srcId\t$dstId\t${attr.toString}"
+}
 
 object Edge {
   def apply[ED](srcId: VertexId, dstId: VertexId, attr: ED): Edge[ED] = new Edge(srcId, dstId, attr)
@@ -62,17 +64,26 @@ object Edge {
         val (asc: Int, adc: Int) = (map(a.srcId), map(a.dstId))
         val (bsc: Int, bdc: Int) = (map(b.srcId), map(b.dstId))
 
-        val (ahist, aver1, aver2) = if (asc <= adc) (asc, a.srcId, a.dstId) else (adc, a.dstId, a.srcId)
-        val (bhist, bver1, bver2) = if (bsc <= bdc) (bsc, b.srcId, b.dstId) else (bdc, b.dstId, b.srcId)
+        val (firstA, secondA, thirdA) = if (asc < adc) (asc, a.srcId, a.dstId)
+        else if (asc == adc && a.srcId < a.dstId) (asc, a.srcId, a.dstId)
+        else if (asc == adc && a.srcId > a.dstId) (adc, a.dstId, a.srcId)
+        else if (asc == adc && a.srcId == a.dstId) (adc, a.dstId, a.srcId)
+        else (adc, a.dstId, a.srcId)
 
-        if (ahist == bhist) {
-          if (aver1 == bver1)
-            if (aver2 == bver2) 0
-            else if (aver2 < bver2) -1
+        val (firstB, secondB, thirdB) = if (bsc < bdc) (bsc, b.srcId, b.dstId)
+        else if (bsc == bdc && b.srcId < b.dstId) (bsc, b.srcId, b.dstId)
+        else if (bsc == bdc && b.srcId > b.dstId) (bdc, b.dstId, b.srcId)
+        else if (bsc == bdc && b.srcId == b.dstId) (bdc, b.dstId, b.srcId)
+        else (bdc, b.dstId, b.srcId)
+
+        if (firstA == firstB) {
+          if (secondA == secondB)
+            if (thirdA == thirdB) 0
+            else if (thirdA < thirdB) -1
             else 1
-          else if (aver1 < bver1) -1
+          else if (secondA < secondB) -1
           else 1
-        } else if (ahist < bhist) -1
+        } else if (firstA < firstB) -1
         else 1
       }
     }

@@ -57,7 +57,7 @@ class RefHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](mask: Int, n: Int, c
     }
   }
 
-  def containKey(k: K): Boolean = {
+  def containsKey(k: K): Boolean = {
     val pos = getPos(k)
     pos >= 0 && bitSet.get(pos)
   }

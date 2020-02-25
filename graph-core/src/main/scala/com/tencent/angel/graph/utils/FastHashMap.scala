@@ -5,10 +5,13 @@ import scala.reflect._
 import scala.{specialized => spec}
 
 
-class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: Float)
+class FastHashMap[@spec(Int, Long) K: ClassTag, @spec(Byte, Int, Long, Float, Double) V: ClassTag](expected: Int, f: Float)
   extends Serializable {
 
   import com.tencent.angel.graph.utils.HashCommon._
+
+  private lazy val keyTag = implicitly[ClassTag[K]].runtimeClass
+  private lazy val valueTag = implicitly[ClassTag[V]].runtimeClass
 
   private var keys: Array[K] = _
   private var values: Array[V] = _
@@ -16,31 +19,32 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
   private var n: Int = arraySize(expected, f)
   private var mask: Int = n - 1
   private var maxFill: Int = calMaxFill(n, f)
-  var size: Int = 0
+  private var minN: Int = n
+  private var numElements: Int = 0
 
-  private val keyTag = classTag[K]
+
   private lazy val nullKey: K = keyTag match {
-    case kt if kt == ClassTag.Int => 0.asInstanceOf[K]
-    case kt if kt == ClassTag.Long => 0L.asInstanceOf[K]
+    case kt if kt == classOf[Int] => 0.asInstanceOf[K]
+    case kt if kt == classOf[Long] => 0.toLong.asInstanceOf[K]
   }
-  private lazy val defaultValue: V = classTag[V] match {
-    case vt if vt == ClassTag.Boolean => false.asInstanceOf[V]
-    case vt if vt == ClassTag.Char => Char.MinValue.asInstanceOf[V]
-    case vt if vt == ClassTag.Byte => 0.toByte.asInstanceOf[V]
-    case vt if vt == ClassTag.Short => 0.toShort.asInstanceOf[V]
-    case vt if vt == ClassTag.Int => 0.asInstanceOf[V]
-    case vt if vt == ClassTag.Long => 0.toLong.asInstanceOf[V]
-    case vt if vt == ClassTag.Float => 0.toFloat.asInstanceOf[V]
-    case vt if vt == ClassTag.Double => 0.toDouble.asInstanceOf[V]
+  private lazy val defaultValue: V = valueTag match {
+    case vt if vt == classOf[Boolean] => false.asInstanceOf[V]
+    case vt if vt == classOf[Char] => Char.MinValue.asInstanceOf[V]
+    case vt if vt == classOf[Byte] => 0.toByte.asInstanceOf[V]
+    case vt if vt == classOf[Short] => 0.toShort.asInstanceOf[V]
+    case vt if vt == classOf[Int] => 0.asInstanceOf[V]
+    case vt if vt == classOf[Long] => 0.toLong.asInstanceOf[V]
+    case vt if vt == classOf[Float] => 0.toFloat.asInstanceOf[V]
+    case vt if vt == classOf[Double] => 0.toDouble.asInstanceOf[V]
   }
 
   keys = new Array[K](n + 1)
   values = new Array[V](n + 1)
 
   private lazy val hash: Hasher[K] = {
-    if (keyTag == ClassTag.Long) {
+    if (keyTag == classOf[Long]) {
       (new LongHasher).asInstanceOf[Hasher[K]]
-    } else if (keyTag == ClassTag.Int) {
+    } else if (keyTag == classOf[Int]) {
       (new IntHasher).asInstanceOf[Hasher[K]]
     } else {
       new Hasher[K]
@@ -51,7 +55,9 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
 
   def this() = this(HashCommon.DEFAULT_INITIAL_SIZE, HashCommon.DEFAULT_LOAD_FACTOR)
 
-  private def realSize: Int = if (containsNullKey) size - 1 else size
+  def size(): Int = numElements
+
+  private def realSize: Int = if (containsNullKey) numElements - 1 else numElements
 
   private def getPos(key: K): Int = {
     if (key == 0) {
@@ -78,19 +84,19 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
     val newKeys: Array[K] = new Array[K](newN + 1)
     val newValues: Array[V] = new Array[V](newN + 1)
 
-    var (i: Int, pos: Int, j: Int) = (n - 1, 0, realSize)
-    if (containsNullKey) {
-      newValues(newN) = values(n)
-    }
-
-    while (j != 0) {
-      while (keys(i) == 0) {
+    var (i: Int, pos: Int, j: Int) = (n, 0, realSize)
+    while (j > 0) {
+      i -= 1
+      while (i >= 0 && keys(i) == 0) {
         i -= 1
       }
 
       pos = hash(keys(i)) & newMask
-      while (newKeys(pos) != 0) {
+      if (newKeys(pos) != 0) {
         pos = (pos + 1) & newMask
+        while (newKeys(pos) != 0) {
+          pos = (pos + 1) & newMask
+        }
       }
 
       newKeys(pos) = keys(i)
@@ -99,9 +105,11 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
       j -= 1
     }
 
+    newValues(newN) = values(n)
+
     this.n = newN
-    this.mask = n - 1
-    this.maxFill = calMaxFill(n, f)
+    this.mask = newN - 1
+    this.maxFill = calMaxFill(newN, f)
     this.keys = newKeys
     this.values = newValues
   }
@@ -110,13 +118,88 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
     if (pos == n) containsNullKey = true
     keys(pos) = k
     values(pos) = v
-    size += 1
-    if (size >= maxFill) rehash(arraySize(size + 1, f))
+    numElements += 1
+    if (numElements - 1 >= maxFill) {
+      rehash(arraySize(numElements + 1, f))
+    }
   }
 
-  def containKey(k: K): Boolean = getPos(k) >= 0
+  private def removeNullEntry(): V = {
+    containsNullKey = false
+    val oldValue = values(n)
+    numElements -= 1
+    if (n > minN && numElements < maxFill / 4 && n > DEFAULT_INITIAL_SIZE)
+      rehash(n / 2)
 
-  /** Get the value for a given key */
+    oldValue
+  }
+
+  private def shiftKeys(p: Int): Unit = {
+    var (last, slot, curr, pos) = (0, 0, nullKey, p)
+    while (true) {
+      last = pos
+      pos = (pos + 1) & mask
+      var flag = true
+      while(flag) {
+        curr = keys(pos)
+        if (curr == 0) {
+          keys(last) = nullKey
+          return
+        }
+
+        slot = hash(curr) & mask
+        val tmp = if (last <= pos) last >= slot || slot > pos else last >= slot && slot > pos
+        if (tmp) {
+          flag = false
+        } else {
+          pos = (pos + 1) & mask
+        }
+      }
+
+      keys(last) = curr
+      values(last) = values(pos)
+    }
+  }
+
+  private def removeEntry(pos: Int): V = {
+    val oldValue = values(pos)
+    numElements -= 1
+    shiftKeys(pos)
+    if (n > minN && numElements < maxFill / 4 && n > DEFAULT_INITIAL_SIZE)
+      rehash(n / 2)
+
+    oldValue
+  }
+
+  def containsKey(k: K): Boolean = {
+    var contain = false
+
+    if (k == 0) {
+      if (containsNullKey) {
+        contain = true
+      }
+    } else {
+      var pos = hash(k) & mask
+      var curr = keys(pos)
+      var flag = false
+
+      while (!flag) {
+        if (curr == 0) {
+          contain = false
+          flag = true
+        } else if (curr == k) {
+          contain = true
+          flag = true
+        } else {
+          pos = (pos + 1) & mask
+          curr = keys(pos)
+        }
+      }
+    }
+
+    contain
+  }
+
   def apply(k: K): V = {
     val pos = getPos(k)
 
@@ -129,13 +212,11 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
 
   def get(k: K): V = apply(k)
 
-  /** Get the value for a given key, or returns elseValue if it doesn't exist. */
   def getOrElse(k: K, elseValue: V): V = {
     val pos = getPos(k)
     if (pos >= 0) values(pos) else elseValue
   }
 
-  /** Set the value for a key */
   def update(k: K, v: V): this.type = {
     val pos = getPos(k)
     if (pos >= 0) {
@@ -187,25 +268,35 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, V: ClassTag](expected: Int, f: F
   }
 
   def remove(k: K): V = {
-    val pos = getPos(k)
+    var preValue = defaultValue
 
-    if (pos >= 0) {
-      val preValue = values(pos)
-      if (pos == n) {
-        containsNullKey = false
-      } else {
-        keys(pos) = nullKey
+    if (k == 0) {
+      if (containsNullKey) {
+        preValue = removeNullEntry()
       }
-      values(pos) = defaultValue
-      size -= 1
-      preValue
     } else {
-      throw new Exception(s"Cannot find key $k")
+      var pos = hash(k) & mask
+      var curr = keys(pos)
+      var flag = false
+
+      while (!flag) {
+        if (curr == 0) {
+          flag = true
+        } else if (curr == k) {
+          preValue = removeEntry(pos)
+          flag = true
+        } else {
+          pos = (pos + 1) & mask
+          curr = keys(pos)
+        }
+      }
     }
+
+    preValue
   }
 
   def clear(): this.type = {
-    size = 0
+    numElements = 0
     var pos = 0
     while (pos < n) {
       if (keys(pos) != 0) {

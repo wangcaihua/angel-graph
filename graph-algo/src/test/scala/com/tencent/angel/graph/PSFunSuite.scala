@@ -4,7 +4,7 @@ package com.tencent.angel.graph
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfterAll, Outcome}
 
-trait PSFunSuite extends AnyFunSuite with BeforeAndAfterAll {
+trait PSFunSuite extends AnyFunSuite {
 
   final protected override def withFixture(test: NoArgTest): Outcome = {
     val testName = test.text

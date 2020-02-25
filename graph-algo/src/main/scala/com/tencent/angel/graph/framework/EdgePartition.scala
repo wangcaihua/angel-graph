@@ -21,7 +21,7 @@ class EdgePartition[VD: ClassTag,
 
   val size: Int = localSrcIds.length
 
-  def indexSize: Int = index.size
+  def indexSize: Int = index.size()
 
   @inline private def srcIdFromPos(pos: Int): VertexId = local2global(localSrcIds(pos))
 
@@ -221,7 +221,7 @@ class EdgePartition[VD: ClassTag,
 
     override def next(): Edge[ED] = {
       pos += 1
-      edgeFromPos(pos)
+      edgeFromPos(pos - 1)
     }
   }
 
