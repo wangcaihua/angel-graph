@@ -1,27 +1,21 @@
 package com.tencent.angel.graph.framework
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util
 
 import com.tencent.angel.graph.VertexId
-import com.tencent.angel.graph.core.data.ANode
 import com.tencent.angel.graph.core.sampler.{Reservoir, SampleK, SampleOne, Simple}
-import com.tencent.angel.graph.utils.{BitSet, FastHashMap}
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
+import com.tencent.angel.graph.utils.{BitSet, FastHashMap, RefHashMap}
 
 import scala.reflect.ClassTag
 
-class NodePartition[VD: ClassTag](global2local: FastHashMap[VertexId, Int]) {
-  private lazy val local2global: Array[VertexId] = {
-    val l2g = new Array[VertexId](global2local.size())
-    global2local.foreach { case (vid: VertexId, idx: Int) => l2g(idx) = vid }
-    l2g
-  }
+class NodePartition[VD: ClassTag, M: ClassTag](val global2local: FastHashMap[VertexId, Int],
+                                               val local2global: Array[VertexId]) {
   private lazy val attrs: Array[VD] = new Array[VD](global2local.size())
   private lazy val mask: BitSet = new BitSet(global2local.size())
-  private lazy val message: Array[Any] = new Array[Any](global2local.size())
-  private lazy val neighs: Array[ANode] = new Array[ANode](global2local.size())
+  private lazy val message: Array[M] = new Array[M](global2local.size())
+  private lazy val slotRefMap = new util.HashMap[String, RefHashMap[_]]()
 
-  private var sampleOne: SampleOne = new Simple(local2global)
+  private var sample1: SampleOne = new Simple(local2global)
   private var sampleK: SampleK = new Reservoir(local2global)
 
   // attribution & message methods
@@ -32,20 +26,20 @@ class NodePartition[VD: ClassTag](global2local: FastHashMap[VertexId, Int]) {
     this
   }
 
-  def getMessage[M](vid: VertexId): M = message(global2local(vid)).asInstanceOf[M]
+  def getMessage(vid: VertexId): M = message(global2local(vid))
 
-  def mergeMessage[M](vid: VertexId, msg: M, mergeFunc: (M, M) => M): this.type = {
+  def mergeMessage(vid: VertexId, msg: M, mergeFunc: (M, M) => M): this.type = {
     val pos = global2local(vid)
     if (message(pos) == null) {
       message(pos) = msg
     } else {
-      message(pos) = mergeFunc(message(pos).asInstanceOf[M], msg)
+      message(pos) = mergeFunc(message(pos), msg)
     }
 
     this
   }
 
-  def updateAttrs[M](update: (VD, M) => VD): this.type = {
+  def updateAttrs(update: (VD, M) => VD): this.type = {
     var i = 0
     while (i < attrs.length) {
       attrs(i) = update(attrs(i), message(i))
@@ -55,15 +49,6 @@ class NodePartition[VD: ClassTag](global2local: FastHashMap[VertexId, Int]) {
 
     this
   }
-
-
-  // neighbor methods
-  def setNeigh(vid: VertexId, neigh: ANode): this.type = {
-    neighs(global2local(vid)) = neigh
-    this
-  }
-
-  def getNeigh(vid: VertexId): ANode = neighs(global2local(vid))
 
   // mask methods
   def setMask(vid: VertexId): this.type = {
@@ -87,11 +72,63 @@ class NodePartition[VD: ClassTag](global2local: FastHashMap[VertexId, Int]) {
     mask.iterator.map(pos => local2global(pos)).toArray
   }
 
+  // slots operations
+  def createSlot[V: ClassTag](name: String): this.type = {
+    if (!slotRefMap.containsKey(name)) {
+      val values = new Array[V](local2global.length)
+      val refMap = new RefHashMap(global2local, local2global, values)
+      slotRefMap.put(name, refMap)
+    } else {
+      throw new Exception(s"slot $name already exists!")
+    }
+
+    this
+  }
+
+  def setSlot[V: ClassTag](name: String, refMap: RefHashMap[V]): this.type = {
+    if (!slotRefMap.containsKey(name)) {
+      slotRefMap.put(name, refMap)
+    } else {
+      throw new Exception(s"slot $name already exists!")
+    }
+
+    this
+  }
+
+  def getOrCreateSlot[V: ClassTag](name: String): RefHashMap[V] = {
+    if (!slotRefMap.containsKey(name)) {
+      val values = new Array[V](local2global.length)
+      val refMap = new RefHashMap(global2local, local2global, values)
+      slotRefMap.put(name, refMap)
+      refMap
+    } else {
+      slotRefMap.get(name).asInstanceOf[RefHashMap[V]]
+    }
+  }
+
+  def removeSlot(name: String): this.type = {
+    if (slotRefMap.containsKey(name)) {
+      slotRefMap.remove(name)
+    }
+    this
+  }
+
+  def getSlot[V: ClassTag](name: String): RefHashMap[V] = {
+    if (!slotRefMap.containsKey(name)) {
+      val values = new Array[V](local2global.length)
+      val refMap = new RefHashMap(global2local, local2global, values)
+      slotRefMap.put(name, refMap)
+      refMap
+    } else {
+      throw new Exception(s"slot $name is not exists!")
+    }
+  }
+
   // sample methods
-  def sample(): VertexId = sampleOne.sample()
+  def sample(): VertexId = sample1.sample()
 
   def setSampleOne(one: SampleOne): this.type = {
-    sampleOne = one
+    sample1 = one
     this
   }
 
@@ -103,21 +140,3 @@ class NodePartition[VD: ClassTag](global2local: FastHashMap[VertexId, Int]) {
   }
 }
 
-object NodePartition {
-  private val _nextId = new AtomicInteger(0)
-
-  def nextId(): Int = {
-    _nextId.getAndIncrement()
-  }
-
-  def toFastHashMap(itMap: Any): FastHashMap[VertexId, Int] = {
-    itMap match {
-      case i2i: Int2IntOpenHashMap if classOf[VertexId] == classOf[Int] =>
-        null
-      case i2i: Int2IntOpenHashMap if classOf[VertexId] == classOf[Long] =>
-        null
-
-    }
-
-  }
-}

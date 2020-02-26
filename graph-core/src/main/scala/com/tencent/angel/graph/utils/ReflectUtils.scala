@@ -132,10 +132,6 @@ object ReflectUtils {
     case _: Float => typeOf[Float]
     case _: Double => typeOf[Double]
     case _: String => typeOf[String]
-    case _: NodeN => typeOf[NodeN]
-    case _: NodeNW => typeOf[NodeNW]
-    case _: NodeTN => typeOf[NodeTN]
-    case _: NodeTNW => typeOf[NodeTNW]
     case _: IntDummyVector => typeOf[IntDummyVector]
     case _: IntIntVector => typeOf[IntIntVector]
     case _: IntLongVector => typeOf[IntLongVector]
@@ -158,10 +154,6 @@ object ReflectUtils {
     case array: Array[_] =>
       if (array.nonEmpty) {
         array.head match {
-          case _: NodeN => typeOf[Array[NodeN]]
-          case _: NodeNW => typeOf[Array[NodeNW]]
-          case _: NodeTN => typeOf[Array[NodeTN]]
-          case _: NodeTNW => typeOf[Array[NodeTNW]]
           case _: IntDummyVector => typeOf[Array[IntDummyVector]]
           case _: IntIntVector => typeOf[Array[IntIntVector]]
           case _: IntLongVector => typeOf[Array[IntLongVector]]
@@ -198,10 +190,6 @@ object ReflectUtils {
         val entry = map.int2ObjectEntrySet().fastIterator().next()
         entry.getValue match {
           case _: String => typeOf[Int2ObjectOpenHashMap[String]]
-          case _: NodeN => typeOf[Int2ObjectOpenHashMap[NodeN]]
-          case _: NodeNW => typeOf[Int2ObjectOpenHashMap[NodeNW]]
-          case _: NodeTN => typeOf[Int2ObjectOpenHashMap[NodeTN]]
-          case _: NodeTNW => typeOf[Int2ObjectOpenHashMap[NodeTNW]]
           case _: IntDummyVector => typeOf[Int2ObjectOpenHashMap[IntDummyVector]]
           case _: IntIntVector => typeOf[Int2ObjectOpenHashMap[IntIntVector]]
           case _: IntLongVector => typeOf[Int2ObjectOpenHashMap[IntLongVector]]
@@ -225,10 +213,6 @@ object ReflectUtils {
             if (array.nonEmpty) {
               array.head match {
                 case _: String => typeOf[Int2ObjectOpenHashMap[Array[String]]]
-                case _: NodeN => typeOf[Int2ObjectOpenHashMap[Array[NodeN]]]
-                case _: NodeNW => typeOf[Int2ObjectOpenHashMap[Array[NodeNW]]]
-                case _: NodeTN => typeOf[Int2ObjectOpenHashMap[Array[NodeTN]]]
-                case _: NodeTNW => typeOf[Int2ObjectOpenHashMap[Array[NodeTNW]]]
                 case _: IntDummyVector => typeOf[Int2ObjectOpenHashMap[Array[IntDummyVector]]]
                 case _: IntIntVector => typeOf[Int2ObjectOpenHashMap[Array[IntIntVector]]]
                 case _: IntLongVector => typeOf[Int2ObjectOpenHashMap[Array[IntLongVector]]]
@@ -253,10 +237,6 @@ object ReflectUtils {
         val entry = map.long2ObjectEntrySet().fastIterator().next()
         entry.getValue match {
           case _: String => typeOf[Long2ObjectOpenHashMap[String]]
-          case _: NodeN => typeOf[Long2ObjectOpenHashMap[NodeN]]
-          case _: NodeNW => typeOf[Long2ObjectOpenHashMap[NodeNW]]
-          case _: NodeTN => typeOf[Long2ObjectOpenHashMap[NodeTN]]
-          case _: NodeTNW => typeOf[Long2ObjectOpenHashMap[NodeTNW]]
           case _: IntDummyVector => typeOf[Long2ObjectOpenHashMap[IntDummyVector]]
           case _: IntIntVector => typeOf[Long2ObjectOpenHashMap[IntIntVector]]
           case _: IntLongVector => typeOf[Long2ObjectOpenHashMap[IntLongVector]]
@@ -280,10 +260,6 @@ object ReflectUtils {
             if (array.nonEmpty) {
               array.head match {
                 case _: String => typeOf[Long2ObjectOpenHashMap[Array[String]]]
-                case _: NodeN => typeOf[Long2ObjectOpenHashMap[Array[NodeN]]]
-                case _: NodeNW => typeOf[Long2ObjectOpenHashMap[Array[NodeNW]]]
-                case _: NodeTN => typeOf[Long2ObjectOpenHashMap[Array[NodeTN]]]
-                case _: NodeTNW => typeOf[Long2ObjectOpenHashMap[Array[NodeTNW]]]
                 case _: IntDummyVector => typeOf[Long2ObjectOpenHashMap[Array[IntDummyVector]]]
                 case _: IntIntVector => typeOf[Long2ObjectOpenHashMap[Array[IntIntVector]]]
                 case _: IntLongVector => typeOf[Long2ObjectOpenHashMap[Array[IntLongVector]]]
@@ -340,11 +316,6 @@ object ReflectUtils {
               case "Long2CharOpenHashMap" => typeOf[Long2CharOpenHashMap]
               case "Long2ShortOpenHashMap" => typeOf[Long2ShortOpenHashMap]
               case "Long2ByteOpenHashMap" => typeOf[Long2ByteOpenHashMap]
-              case "ANode" => typeOf[ANode]
-              case "NodeN" => typeOf[NodeN]
-              case "NodeNW" => typeOf[NodeNW]
-              case "NodeTN" => typeOf[NodeTN]
-              case "NodeTNW" => typeOf[NodeTNW]
               case "IntDummyVector" => typeOf[IntDummyVector]
               case "IntIntVector" => typeOf[IntIntVector]
               case "IntLongVector" => typeOf[IntLongVector]
@@ -368,11 +339,6 @@ object ReflectUtils {
               case "Short" => typeOf[Array[Short]]
               case "Byte" => typeOf[Array[Byte]]
               case "String" => typeOf[Array[String]]
-              case "ANode" => typeOf[Array[ANode]]
-              case "NodeN" => typeOf[Array[NodeN]]
-              case "NodeNW" => typeOf[Array[NodeNW]]
-              case "NodeTN" => typeOf[Array[NodeTN]]
-              case "NodeTNW" => typeOf[Array[NodeTNW]]
               case "IntDummyVector" => typeOf[Array[IntDummyVector]]
               case "IntIntVector" => typeOf[Array[IntIntVector]]
               case "IntLongVector" => typeOf[Array[IntLongVector]]
@@ -390,11 +356,6 @@ object ReflectUtils {
             outerType match {
               case "Int2ObjectOpenHashMap" =>
                 innerType match {
-                  case "ANode" => typeOf[Int2ObjectOpenHashMap[ANode]]
-                  case "NodeN" => typeOf[Int2ObjectOpenHashMap[NodeN]]
-                  case "NodeNW" => typeOf[Int2ObjectOpenHashMap[NodeNW]]
-                  case "NodeTN" => typeOf[Int2ObjectOpenHashMap[NodeTN]]
-                  case "NodeTNW" => typeOf[Int2ObjectOpenHashMap[NodeTNW]]
                   case "IntDummyVector" => typeOf[Int2ObjectOpenHashMap[IntDummyVector]]
                   case "IntIntVector" => typeOf[Int2ObjectOpenHashMap[IntIntVector]]
                   case "IntLongVector" => typeOf[Int2ObjectOpenHashMap[IntLongVector]]
@@ -408,11 +369,6 @@ object ReflectUtils {
                 }
               case "Long2ObjectOpenHashMap" =>
                 innerType match {
-                  case "ANode" => typeOf[Long2ObjectOpenHashMap[ANode]]
-                  case "NodeN" => typeOf[Long2ObjectOpenHashMap[NodeN]]
-                  case "NodeNW" => typeOf[Long2ObjectOpenHashMap[NodeNW]]
-                  case "NodeTN" => typeOf[Long2ObjectOpenHashMap[NodeTN]]
-                  case "NodeTNW" => typeOf[Long2ObjectOpenHashMap[NodeTNW]]
                   case "IntDummyVector" => typeOf[Long2ObjectOpenHashMap[IntDummyVector]]
                   case "IntIntVector" => typeOf[Long2ObjectOpenHashMap[IntIntVector]]
                   case "IntLongVector" => typeOf[Long2ObjectOpenHashMap[IntLongVector]]
@@ -440,11 +396,6 @@ object ReflectUtils {
                   case "Short" => typeOf[Int2ObjectOpenHashMap[Array[Short]]]
                   case "Byte" => typeOf[Int2ObjectOpenHashMap[Array[Byte]]]
                   case "String" => typeOf[Int2ObjectOpenHashMap[Array[String]]]
-                  case "ANode" => typeOf[Int2ObjectOpenHashMap[Array[ANode]]]
-                  case "NodeN" => typeOf[Int2ObjectOpenHashMap[Array[NodeN]]]
-                  case "NodeNW" => typeOf[Int2ObjectOpenHashMap[Array[NodeNW]]]
-                  case "NodeTN" => typeOf[Int2ObjectOpenHashMap[Array[NodeTN]]]
-                  case "NodeTNW" => typeOf[Int2ObjectOpenHashMap[Array[NodeTNW]]]
                   case "IntDummyVector" => typeOf[Int2ObjectOpenHashMap[Array[IntDummyVector]]]
                   case "IntIntVector" => typeOf[Int2ObjectOpenHashMap[Array[IntIntVector]]]
                   case "IntLongVector" => typeOf[Int2ObjectOpenHashMap[Array[IntLongVector]]]
@@ -467,11 +418,6 @@ object ReflectUtils {
                   case "Short" => typeOf[Long2ObjectOpenHashMap[Array[Short]]]
                   case "Byte" => typeOf[Long2ObjectOpenHashMap[Array[Byte]]]
                   case "String" => typeOf[Long2ObjectOpenHashMap[Array[String]]]
-                  case "ANode" => typeOf[Long2ObjectOpenHashMap[Array[ANode]]]
-                  case "NodeN" => typeOf[Long2ObjectOpenHashMap[Array[NodeN]]]
-                  case "NodeNW" => typeOf[Long2ObjectOpenHashMap[Array[NodeNW]]]
-                  case "NodeTN" => typeOf[Long2ObjectOpenHashMap[Array[NodeTN]]]
-                  case "NodeTNW" => typeOf[Long2ObjectOpenHashMap[Array[NodeTNW]]]
                   case "IntDummyVector" => typeOf[Long2ObjectOpenHashMap[Array[IntDummyVector]]]
                   case "IntIntVector" => typeOf[Long2ObjectOpenHashMap[Array[IntIntVector]]]
                   case "IntLongVector" => typeOf[Long2ObjectOpenHashMap[Array[IntLongVector]]]
