@@ -75,8 +75,7 @@ class NodePartition[VD: ClassTag, M: ClassTag](val global2local: FastHashMap[Ver
   // slots operations
   def createSlot[V: ClassTag](name: String): this.type = {
     if (!slotRefMap.containsKey(name)) {
-      val values = new Array[V](local2global.length)
-      val refMap = new RefHashMap(global2local, local2global, values)
+      val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap.put(name, refMap)
     } else {
       throw new Exception(s"slot $name already exists!")
@@ -97,8 +96,7 @@ class NodePartition[VD: ClassTag, M: ClassTag](val global2local: FastHashMap[Ver
 
   def getOrCreateSlot[V: ClassTag](name: String): RefHashMap[V] = {
     if (!slotRefMap.containsKey(name)) {
-      val values = new Array[V](local2global.length)
-      val refMap = new RefHashMap(global2local, local2global, values)
+      val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap.put(name, refMap)
       refMap
     } else {
@@ -115,10 +113,7 @@ class NodePartition[VD: ClassTag, M: ClassTag](val global2local: FastHashMap[Ver
 
   def getSlot[V: ClassTag](name: String): RefHashMap[V] = {
     if (!slotRefMap.containsKey(name)) {
-      val values = new Array[V](local2global.length)
-      val refMap = new RefHashMap(global2local, local2global, values)
-      slotRefMap.put(name, refMap)
-      refMap
+      slotRefMap.get(name).asInstanceOf[RefHashMap[V]]
     } else {
       throw new Exception(s"slot $name is not exists!")
     }
@@ -137,6 +132,22 @@ class NodePartition[VD: ClassTag, M: ClassTag](val global2local: FastHashMap[Ver
   def setSampleK(sk: SampleK): this.type = {
     sampleK = sk
     this
+  }
+}
+
+object NodePartition {
+  private val partitions = new util.HashMap[(Int, Int), NodePartition[_,_]]()
+
+  def get[VD: ClassTag, M: ClassTag](key: (Int, Int)): NodePartition[VD, M] = {
+    if (partitions.containsKey(key)) {
+      partitions.get(key).asInstanceOf[NodePartition[VD, M]]
+    } else {
+      null.asInstanceOf[NodePartition[VD, M]]
+    }
+  }
+
+  def set(key: (Int, Int), partition: NodePartition[_,_]): Unit = {
+    partitions.put(key, partition)
   }
 }
 

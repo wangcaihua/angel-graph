@@ -535,6 +535,7 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag](expected: Int
         temp(idx) = reIdx
         local2global(reIdx) = key.asInstanceOf[VertexId]
         reIdx += 1
+      case _ =>
     }
 
     if (containsNullKey && values(n) != defaultValue) {
@@ -556,14 +557,7 @@ object FastHashMap {
   import com.tencent.angel.graph.utils.HashCommon._
 
   def getIdMaps(empty: Any): (FastHashMap[VertexId, Int], Array[VertexId]) = {
-    val keys: Array[VertexId] = getField[Array[VertexId]](empty, "key")
-    val values: Array[Int] = getField[Array[Int]](empty, "value")
-    val containsNullKey: Boolean = getField[Boolean](empty, "containsNullKey")
-    val n: Int = getField[Int](empty, "n")
-    val f: Float = getField[Int](empty, "f")
-    val numElements: Int = getField[Int](empty, "size")
-
-    new FastHashMap[VertexId, Int](keys, values, containsNullKey, n, f, numElements).asIdMaps
+    fromUnimi[VertexId, Int](empty).asIdMaps
   }
 
   def fromUnimi[K: ClassTag, V: ClassTag](empty: Any): FastHashMap[K, V] = {
@@ -571,13 +565,13 @@ object FastHashMap {
     val values: Array[V] = getField[Array[V]](empty, "value")
     val containsNullKey: Boolean = getField[Boolean](empty, "containsNullKey")
     val n: Int = getField[Int](empty, "n")
-    val f: Float = getField[Int](empty, "f")
+    val f: Float = getField[Float](empty, "f")
     val numElements: Int = getField[Int](empty, "size")
 
     new FastHashMap[K, V](keys, values, containsNullKey, n, f, numElements)
   }
 
-  def toUnimi[K: ClassTag, V: ClassTag](keys: Array[K], values: Array[V], containsNullKey: Boolean,
+  private[FastHashMap] def toUnimi[K: ClassTag, V: ClassTag](keys: Array[K], values: Array[V], containsNullKey: Boolean,
                                         n: Int, f: Float, numElements: Int, unimiMap: Any): Any = {
     setField(unimiMap, "key", keys)
     setField(unimiMap, "value", values)
