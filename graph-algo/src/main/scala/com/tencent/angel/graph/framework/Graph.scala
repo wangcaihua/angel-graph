@@ -301,7 +301,7 @@ object Graph {
   }
 
 
-  def fromEdgeRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexId, WgtTpe)],
+  def fromEdgeWithWeightRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexId, WgtTpe)],
                                 edgeDirection: EdgeDirection = EdgeDirection.Out,
                                 canonicalOrientation: Boolean = false,
                                 storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
@@ -387,7 +387,7 @@ object Graph {
   }
 
 
-  def fromTypedEdgeRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType, WgtTpe)],
+  def fromTypedEdgeWithWeightRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType, WgtTpe)],
                                      edgeDirection: EdgeDirection = EdgeDirection.Out,
                                      canonicalOrientation: Boolean = false,
                                      storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, Long] = {
