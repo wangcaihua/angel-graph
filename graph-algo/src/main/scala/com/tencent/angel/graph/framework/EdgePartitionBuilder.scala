@@ -143,7 +143,7 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
     }
 
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global.trim().array, vertexAttrs, edgeDirection, None)
+      global2local, local2global.trim().array, vertexAttrs, None)
   }
 }
 
@@ -266,7 +266,7 @@ class ExistingEdgePartitionBuilder[VD: ClassTag, @spec(Long, Int, Float, Double)
     }
 
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, vertexAttrs, edgeDirection, activeSet)
+      global2local, local2global, vertexAttrs, activeSet)
   }
 }
 

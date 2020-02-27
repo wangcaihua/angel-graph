@@ -1,7 +1,6 @@
 package com.tencent.angel.graph.framework
 
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
-import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
 import com.tencent.angel.graph.utils.{BitSet, FastHashMap}
 import com.tencent.angel.graph.{VertexId, VertexSet}
 
@@ -9,31 +8,36 @@ import scala.reflect._
 import scala.{specialized => spec}
 
 class EdgePartition[VD: ClassTag,
-@spec(Int, Long, Float, Double) ED: ClassTag](localSrcIds: Array[Int],
-                                              localDstIds: Array[Int],
-                                              data: Array[ED],
-                                              index: FastHashMap[VertexId, (Int, Int)],
-                                              global2local: FastHashMap[VertexId, Int],
-                                              local2global: Array[VertexId],
-                                              vertexAttrs: Array[VD],
-                                              edgeDirection: EdgeDirection,
-                                              activeSet: Option[VertexSet]) extends Serializable {
+@spec(Int, Long, Float, Double) ED: ClassTag](val localSrcIds: Array[Int],
+                                              val localDstIds: Array[Int],
+                                              val data: Array[ED],
+                                              val index: FastHashMap[VertexId, (Int, Int)],
+                                              val global2local: FastHashMap[VertexId, Int],
+                                              val local2global: Array[VertexId],
+                                              val vertexAttrs: Array[VD],
+                                              val activeSet: Option[VertexSet]) extends Serializable {
 
   val size: Int = localSrcIds.length
 
+  lazy val maxVertexId: VertexId = local2global.max
+
+  lazy val minVertexId: VertexId = local2global.min
+
+  def localVertices: Array[VertexId] = local2global
+
   def indexSize: Int = index.size()
 
-  @inline private def srcIdFromPos(pos: Int): VertexId = local2global(localSrcIds(pos))
+  @inline def srcIdFromPos(pos: Int): VertexId = local2global(localSrcIds(pos))
 
-  @inline private def dstIdFromPos(pos: Int): VertexId = local2global(localDstIds(pos))
+  @inline def dstIdFromPos(pos: Int): VertexId = local2global(localDstIds(pos))
 
-  @inline private def vertexAttrFromId(VerId: VertexId): VD = vertexAttrs(global2local(VerId))
+  @inline def vertexAttrFromId(VerId: VertexId): VD = vertexAttrs(global2local(VerId))
 
-  @inline private def edgeFromPos(pos: Int): Edge[ED] = {
+  @inline def edgeFromPos(pos: Int): Edge[ED] = {
     Edge(srcIdFromPos(pos), dstIdFromPos(pos), data(pos))
   }
 
-  @inline private def tripletFromPos(pos: Int): EdgeTriplet[VD, ED] = {
+  @inline def tripletFromPos(pos: Int): EdgeTriplet[VD, ED] = {
     val srcId = srcIdFromPos(pos)
     val dstId = dstIdFromPos(pos)
     EdgeTriplet(srcId, dstId, vertexAttrFromId(srcId), vertexAttrFromId(dstId), data(pos))
@@ -63,7 +67,7 @@ class EdgePartition[VD: ClassTag,
 
   def withData[ED2: ClassTag](newData: Array[ED2]): EdgePartition[VD, ED2] = {
     new EdgePartition[VD, ED2](localSrcIds, localDstIds, newData, index,
-      global2local, local2global, vertexAttrs, edgeDirection, activeSet)
+      global2local, local2global, vertexAttrs, activeSet)
   }
 
   def withActiveSet(iter: Iterator[VertexId]): EdgePartition[VD, ED] = {
@@ -72,7 +76,7 @@ class EdgePartition[VD: ClassTag,
       activeSet.add(iter.next())
     }
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, vertexAttrs, edgeDirection, Some(activeSet))
+      global2local, local2global, vertexAttrs, Some(activeSet))
   }
 
   def updateVertices(iter: Iterator[(VertexId, VD)]): EdgePartition[VD, ED] = {
@@ -83,13 +87,13 @@ class EdgePartition[VD: ClassTag,
       newVertexAttrs(global2local(kv._1)) = kv._2
     }
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, newVertexAttrs, edgeDirection, activeSet)
+      global2local, local2global, newVertexAttrs, activeSet)
   }
 
   def withoutVertexAttributes[VD2: ClassTag](): EdgePartition[VD2, ED] = {
     val newVertexAttrs = new Array[VD2](vertexAttrs.length)
     new EdgePartition[VD2, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, newVertexAttrs, edgeDirection, activeSet)
+      global2local, local2global, newVertexAttrs, activeSet)
   }
 
   def map[ED2: ClassTag](f: Edge[ED] => ED2): EdgePartition[VD, ED2] = {

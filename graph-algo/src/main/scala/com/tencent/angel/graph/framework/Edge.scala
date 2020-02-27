@@ -1,16 +1,19 @@
 package com.tencent.angel.graph.framework
 
-import com.tencent.angel.graph.VertexId
+import java.nio.ByteBuffer
+
+import com.tencent.angel.graph._
 import com.tencent.angel.graph.utils.{FastHashMap, SortDataFormat}
 
 import scala.{specialized => spec}
 
-class Edge[@spec(Int, Long, Float, Double) ED](val srcId: VertexId, val dstId: VertexId, val attr: ED)
-  extends Serializable {
+class Edge[@spec(Boolean, Char, Byte, Short, Int, Long, Float, Double) ED]
+(val srcId: VertexId, val dstId: VertexId, val attr: ED) extends Serializable {
   override def toString: String = s"$srcId\t$dstId\t${attr.toString}"
 }
 
 object Edge {
+
   def apply[ED](srcId: VertexId, dstId: VertexId, attr: ED): Edge[ED] = new Edge(srcId, dstId, attr)
 
   def unapply[ED](edge: Edge[ED]): Option[(VertexId, VertexId, ED)] = {
@@ -118,14 +121,16 @@ object Edge {
   }
 }
 
-case class EdgeTriplet[VD, ED](srcId: VertexId, dstId:VertexId, srcAttr: VD, dstAttr: VD, attr: ED)
+case class EdgeTriplet[VD, ED](srcId: VertexId, dstId: VertexId, srcAttr: VD, dstAttr: VD, attr: ED)
   extends Serializable {
   def edge: Edge[ED] = Edge(srcId, dstId, attr)
+
   def src: Node[VD] = Node(srcId, srcAttr)
+
   def dst: Node[VD] = Node(dstId, dstAttr)
 }
 
-class TripletFields(val useSrc:Boolean, val useDst: Boolean, val useEdge: Boolean)
+class TripletFields(val useSrc: Boolean, val useDst: Boolean, val useEdge: Boolean)
 
 object TripletFields {
   def apply(): TripletFields = {
@@ -175,12 +180,12 @@ object EdgeContext {
     Some((edge.srcId, edge.dstId, edge.srcAttr, edge.dstAttr, edge.attr))
 }
 
-object EdgeActiveness extends Enumeration {
+object EdgeActiveness extends Enumeration with Serializable {
   type EdgeActiveness = Value
   val Neither, SrcOnly, DstOnly, Both, Either = Value
 }
 
-object EdgeDirection extends Enumeration {
+object EdgeDirection extends Enumeration with Serializable {
   type EdgeDirection = Value
   val In, Out, Either, Both = Value
 }

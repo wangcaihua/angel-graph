@@ -50,12 +50,10 @@ trait WithSONA extends WithSpark {
   def createMatrix(name: String, minId: Long, maxId: Long): PSMatrix = {
     val matrix = new MatrixContext(name, 1, minId, maxId)
     matrix.setValidIndexNum(-1)
-    if (classOf[VertexId] == classOf[Int]) {
-      matrix.setRowType(RowType.T_INT_SPARSE)
-    } else if (classOf[VertexId] == classOf[Long]) {
+    if (classOf[VertexId] == classOf[Long]) {
       matrix.setRowType(RowType.T_INT_SPARSE_LONGKEY)
     } else {
-      throw new Exception("RowType error!")
+      matrix.setRowType(RowType.T_INT_SPARSE)
     }
 
     PSMatrix.matrix(matrix)

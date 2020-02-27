@@ -2,6 +2,7 @@ package com.tencent.angel.graph.utils
 
 import java.util
 
+import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data._
 import com.tencent.angel.ml.math2.vector._
 import it.unimi.dsi.fastutil.ints._
@@ -291,6 +292,7 @@ object ReflectUtils {
           case SIMPLE(value: String) =>
             val simpleType = if (value.contains(".")) value.split("\\.").last else value
             simpleType match {
+              case "VertexId" => typeOf[VertexId]
               case "Int" => typeOf[Int]
               case "Long" => typeOf[Long]
               case "Float" => typeOf[Float]
@@ -330,6 +332,7 @@ object ReflectUtils {
           case ARRAY(value: String) =>
             val elementType = if (value.contains(".")) value.split("\\.").last else value
             elementType match {
+              case "VertexId" => typeOf[Array[VertexId]]
               case "Int" => typeOf[Array[Int]]
               case "Long" => typeOf[Array[Long]]
               case "Float" => typeOf[Array[Float]]
@@ -387,6 +390,7 @@ object ReflectUtils {
             outerType match {
               case "Int2ObjectOpenHashMap" =>
                 innerType match {
+                  case "VertexId" => typeOf[Int2ObjectOpenHashMap[Array[VertexId]]]
                   case "Int" => typeOf[Int2ObjectOpenHashMap[Array[Int]]]
                   case "Long" => typeOf[Int2ObjectOpenHashMap[Array[Long]]]
                   case "Float" => typeOf[Int2ObjectOpenHashMap[Array[Float]]]
@@ -409,6 +413,7 @@ object ReflectUtils {
                 }
               case "Long2ObjectOpenHashMap" =>
                 innerType match {
+                  case "VertexId" => typeOf[Long2ObjectOpenHashMap[Array[VertexId]]]
                   case "Int" => typeOf[Long2ObjectOpenHashMap[Array[Int]]]
                   case "Long" => typeOf[Long2ObjectOpenHashMap[Array[Long]]]
                   case "Float" => typeOf[Long2ObjectOpenHashMap[Array[Float]]]
