@@ -19,7 +19,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 
-class Graph[VD: ClassTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) extends Serializable {
+class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) extends Serializable {
   private val psMatrixName = s"PSPartition_${UUID.randomUUID()}"
   var vertices: RDD[NodePartition[VD]] = _
 
@@ -56,7 +56,7 @@ class Graph[VD: ClassTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) e
     psMatrix
   }
 
-  def initUntypedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
+  def untypedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
     edges.foreachPartition { iter =>
       val edgePartition = iter.next()
 
@@ -132,7 +132,7 @@ class Graph[VD: ClassTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) e
     this
   }
 
-  def initTypedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
+  def typedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
     edges.foreachPartition { iter =>
       val edgePartition = iter.next()
 
@@ -219,12 +219,12 @@ class Graph[VD: ClassTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) e
 }
 
 object Graph {
-  def edgeListFile[VD: ClassTag](sc: SparkContext, path: String,
-                                 numEdgePartition: Int = -1,
-                                 edgeDirection: EdgeDirection = EdgeDirection.Both,
-                                 canonicalOrientation: Boolean = false,
-                                 storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
-                                ): Graph[VD, WgtTpe] = {
+  def edgeListFile[VD: ClassTag : TypeTag](sc: SparkContext, path: String,
+                                           numEdgePartition: Int = -1,
+                                           edgeDirection: EdgeDirection = EdgeDirection.Both,
+                                           canonicalOrientation: Boolean = false,
+                                           storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
+                                          ): Graph[VD, WgtTpe] = {
     val lines = if (numEdgePartition > 0) {
       sc.textFile(path, numEdgePartition).coalesce(numEdgePartition)
     } else {
@@ -280,10 +280,10 @@ object Graph {
   }
 
 
-  def fromEdgeRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexId)],
-                                edgeDirection: EdgeDirection = EdgeDirection.Out,
-                                canonicalOrientation: Boolean = false,
-                                storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
+  def fromEdgeRDD[VD: ClassTag : TypeTag](rdd: RDD[(VertexId, VertexId)],
+                                          edgeDirection: EdgeDirection = EdgeDirection.Out,
+                                          canonicalOrientation: Boolean = false,
+                                          storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
 
     val edges = rdd.mapPartitions { iter =>
       val builder = new EdgePartitionBuilder[VD, WgtTpe](edgeDirection = edgeDirection)
@@ -301,10 +301,10 @@ object Graph {
   }
 
 
-  def fromEdgeWithWeightRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexId, WgtTpe)],
-                                edgeDirection: EdgeDirection = EdgeDirection.Out,
-                                canonicalOrientation: Boolean = false,
-                                storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
+  def fromEdgeWithWeightRDD[VD: ClassTag : TypeTag](rdd: RDD[(VertexId, VertexId, WgtTpe)],
+                                                    edgeDirection: EdgeDirection = EdgeDirection.Out,
+                                                    canonicalOrientation: Boolean = false,
+                                                    storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
 
     val edges = rdd.mapPartitions { iter =>
       val builder = new EdgePartitionBuilder[VD, WgtTpe](edgeDirection = edgeDirection)
@@ -322,12 +322,12 @@ object Graph {
   }
 
 
-  def typedEdgeListFile[VD: ClassTag](sc: SparkContext, path: String,
-                                      numEdgePartition: Int = -1,
-                                      edgeDirection: EdgeDirection = EdgeDirection.Both,
-                                      canonicalOrientation: Boolean = false,
-                                      storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
-                                     ): Graph[VD, Long] = {
+  def typedEdgeListFile[VD: ClassTag : TypeTag](sc: SparkContext, path: String,
+                                                numEdgePartition: Int = -1,
+                                                edgeDirection: EdgeDirection = EdgeDirection.Both,
+                                                canonicalOrientation: Boolean = false,
+                                                storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
+                                               ): Graph[VD, Long] = {
     val lines = if (numEdgePartition > 0) {
       sc.textFile(path, numEdgePartition).coalesce(numEdgePartition)
     } else {
@@ -387,10 +387,10 @@ object Graph {
   }
 
 
-  def fromTypedEdgeWithWeightRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType, WgtTpe)],
-                                     edgeDirection: EdgeDirection = EdgeDirection.Out,
-                                     canonicalOrientation: Boolean = false,
-                                     storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, Long] = {
+  def fromTypedEdgeWithWeightRDD[VD: ClassTag : TypeTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType, WgtTpe)],
+                                                         edgeDirection: EdgeDirection = EdgeDirection.Out,
+                                                         canonicalOrientation: Boolean = false,
+                                                         storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, Long] = {
 
     val edges = rdd.mapPartitions { iter =>
       val builder = new EdgePartitionBuilder[VD, Long](edgeDirection = edgeDirection)
@@ -408,10 +408,10 @@ object Graph {
     new Graph(edges)
   }
 
-  def fromTypedEdgeRDD[VD: ClassTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType)],
-                                     edgeDirection: EdgeDirection = EdgeDirection.Out,
-                                     canonicalOrientation: Boolean = false,
-                                     storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, Long] = {
+  def fromTypedEdgeRDD[VD: ClassTag : TypeTag](rdd: RDD[(VertexId, VertexType, VertexId, VertexType)],
+                                               edgeDirection: EdgeDirection = EdgeDirection.Out,
+                                               canonicalOrientation: Boolean = false,
+                                               storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, Long] = {
 
     val edges = rdd.mapPartitions { iter =>
       val builder = new EdgePartitionBuilder[VD, Long](edgeDirection = edgeDirection)

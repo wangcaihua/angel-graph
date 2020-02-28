@@ -6,8 +6,9 @@ import com.tencent.angel.graph.{VertexId, VertexSet}
 
 import scala.reflect._
 import scala.{specialized => spec}
+import scala.reflect.runtime.universe.TypeTag
 
-class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: ClassTag]
+class EdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Int, Long, Float, Double) ED: ClassTag]
 (size: Int = 64, edgeDirection: EdgeDirection = EdgeDirection.Out) {
   private val edges = new FastArray[Edge[ED]](size)
 
@@ -44,13 +45,29 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
     val index = new FastHashMap[VertexId, (Int, Int)]
     val global2local = new FastHashMap[VertexId, Int]
     val local2global = new FastArray[VertexId]
+    var localDegreeHist: Array[Int] = Array.empty[Int]
     var vertexAttrs = Array.empty[VD]
+    var vertexHist: FastHashMap[VertexId, Int] = null
 
     def mergeFunc(v1: (Int, Int), v2: (Int, Int)): (Int, Int) = {
       val x1 = if (v1._1 < v2._1) v1._1 else v1._1
       val x2 = v1._2 + v2._2
 
       x1 -> x2
+    }
+
+    def orderKey(edge: Edge[ED]): VertexId = {
+      if (vertexHist(edge.srcId) < vertexHist(edge.dstId)) {
+        edge.srcId
+      } else if (vertexHist(edge.srcId) > vertexHist(edge.dstId)) {
+        edge.dstId
+      } else {
+        if (edge.srcId < edge.dstId) {
+          edge.srcId
+        } else {
+          edge.dstId
+        }
+      }
     }
 
     if (edgeDirection == EdgeDirection.Out) {
@@ -68,24 +85,10 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
         index.putMerge(edge.dstId, (idx, 1), mergeFunc)
       }
     } else if (edgeDirection == EdgeDirection.Both) {
-      val vertexHist = Edge.vertexHist(edgeArray)
+      vertexHist = Edge.vertexHist(edgeArray)
       val pairOrdering = Edge.pairOrdering[ED](vertexHist)
       new Sorter(Edge.sortDataFormat[ED])
         .sort(edgeArray, 0, edgeArray.length, pairOrdering)
-
-      def orderKey(edge: Edge[ED]): VertexId = {
-        if (vertexHist(edge.srcId) < vertexHist(edge.dstId)) {
-          edge.srcId
-        } else if (vertexHist(edge.srcId) > vertexHist(edge.dstId)) {
-          edge.dstId
-        } else {
-          if (edge.srcId < edge.dstId) {
-            edge.srcId
-          } else {
-            edge.dstId
-          }
-        }
-      }
 
       edgeArray.zipWithIndex.foreach { case (edge, idx) =>
         val currKey = orderKey(edge)
@@ -142,15 +145,23 @@ class EdgePartitionBuilder[VD: ClassTag, @spec(Int, Long, Float, Double) ED: Cla
       vertexAttrs = new Array[VD](currLocalId + 1)
     }
 
+    if (edgeDirection == EdgeDirection.Both) {
+      localDegreeHist = new Array[Int](local2global.size)
+      global2local.foreach { case (vid, idx) =>
+        localDegreeHist(idx) = vertexHist(vid)
+      }
+    }
+
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global.trim().array, vertexAttrs, None)
+      global2local, local2global.trim().array, vertexAttrs, localDegreeHist, None)
   }
 }
 
-class ExistingEdgePartitionBuilder[VD: ClassTag, @spec(Long, Int, Float, Double) ED: ClassTag]
+class ExistingEdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Long, Int, Float, Double) ED: ClassTag]
 (global2local: FastHashMap[VertexId, Int],
  local2global: Array[VertexId],
  vertexAttrs: Array[VD],
+ localDegreeHist: Array[Int],
  activeSet: Option[VertexSet],
  size: Int = 64,
  edgeDirection: EdgeDirection = EdgeDirection.Out) {
@@ -266,7 +277,7 @@ class ExistingEdgePartitionBuilder[VD: ClassTag, @spec(Long, Int, Float, Double)
     }
 
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, vertexAttrs, activeSet)
+      global2local, local2global, vertexAttrs, localDegreeHist, activeSet)
   }
 }
 

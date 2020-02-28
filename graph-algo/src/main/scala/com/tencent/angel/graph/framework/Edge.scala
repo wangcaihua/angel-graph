@@ -1,7 +1,5 @@
 package com.tencent.angel.graph.framework
 
-import java.nio.ByteBuffer
-
 import com.tencent.angel.graph._
 import com.tencent.angel.graph.utils.{FastHashMap, SortDataFormat}
 

@@ -3,7 +3,6 @@ package com.tencent.angel.graph.utils
 import java.util
 
 import com.tencent.angel.graph.VertexId
-import com.tencent.angel.graph.core.data._
 import com.tencent.angel.ml.math2.vector._
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._

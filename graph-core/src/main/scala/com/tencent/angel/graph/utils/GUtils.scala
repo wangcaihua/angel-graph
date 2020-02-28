@@ -1,6 +1,5 @@
 package com.tencent.angel.graph.utils
 
-import com.tencent.angel.common.Serialize
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.vector.Vector
@@ -45,7 +44,12 @@ object GUtils {
       if (t1 =:= t2) {
         true
       } else {
-        false
+        val t3 = typeOf[FastHashMap[_, _]].typeSymbol.asClass.toType
+        if (t1 =:= t3 && tpe.typeArgs.head =:= typeOf[Int]) {
+          true
+        } else {
+          false
+        }
       }
   }
 
@@ -64,42 +68,49 @@ object GUtils {
       if (t1 =:= t2) {
         true
       } else {
-        false
+        val t3 = typeOf[FastHashMap[_, _]].typeSymbol.asClass.toType
+        if (t1 =:= t3 && tpe.typeArgs.head =:= typeOf[Long]) {
+          true
+        } else {
+          false
+        }
       }
   }
 
   def getFastMapKeys(value: Any): Array[VertexId] = {
     typeOf[VertexId] match {
       case t if t =:= typeOf[Int] =>
-        val (size, iterator) = value match {
-          case v: Int2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2CharOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2ByteOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2ShortOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2IntOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2LongOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2FloatOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2DoubleOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Int2ObjectOpenHashMap[_] => (v.size(), v.keySet().iterator())
+        val array = value match {
+          case v: FastHashMap[Int, _] => v.keyArray
+          case v: Int2BooleanOpenHashMap => v.keySet().toIntArray
+          case v: Int2CharOpenHashMap => v.keySet().toIntArray
+          case v: Int2ByteOpenHashMap => v.keySet().toIntArray
+          case v: Int2ShortOpenHashMap => v.keySet().toIntArray
+          case v: Int2IntOpenHashMap => v.keySet().toIntArray
+          case v: Int2LongOpenHashMap => v.keySet().toIntArray
+          case v: Int2FloatOpenHashMap => v.keySet().toIntArray
+          case v: Int2DoubleOpenHashMap => v.keySet().toIntArray
+          case v: Int2ObjectOpenHashMap[_] => v.keySet().toIntArray
           case _ =>
             throw new Exception("error type!")
         }
-        Array.tabulate[VertexId](size)(_ => iterator.nextInt().asInstanceOf[VertexId])
+        array.asInstanceOf[Array[VertexId]]
       case t if t =:= typeOf[Long] =>
-        val (size, iterator) = value match {
-          case v: Long2BooleanOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2CharOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2ByteOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2ShortOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2IntOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2LongOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2FloatOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2DoubleOpenHashMap => (v.size(), v.keySet().iterator())
-          case v: Long2ObjectOpenHashMap[_] => (v.size(), v.keySet().iterator())
+        val array = value match {
+          case v: FastHashMap[Long, _] => v.keyArray
+          case v: Long2BooleanOpenHashMap => v.keySet().toLongArray
+          case v: Long2CharOpenHashMap => v.keySet().toLongArray
+          case v: Long2ByteOpenHashMap => v.keySet().toLongArray
+          case v: Long2ShortOpenHashMap => v.keySet().toLongArray
+          case v: Long2IntOpenHashMap => v.keySet().toLongArray
+          case v: Long2LongOpenHashMap => v.keySet().toLongArray
+          case v: Long2FloatOpenHashMap => v.keySet().toLongArray
+          case v: Long2DoubleOpenHashMap => v.keySet().toLongArray
+          case v: Long2ObjectOpenHashMap[_] => v.keySet().toLongArray
           case _ =>
             throw new Exception("error type!")
         }
-        Array.tabulate[VertexId](size)(_ => iterator.nextLong().asInstanceOf[VertexId])
+        array.asInstanceOf[Array[VertexId]]
     }
   }
 
@@ -108,13 +119,38 @@ object GUtils {
   def isSerIntKeyMap(tpe: Type): Boolean = {
     val t1 = tpe.typeSymbol.asClass.toType
     val t2 = typeOf[Int2ObjectOpenHashMap[_]].typeSymbol.asClass.toType
-    t1 =:= t2 && tpe.typeArgs.head <:< typeOf[Serialize]
+    val t3 = typeOf[FastHashMap[Int, _]].typeSymbol.asClass.toType
+    if (t1 =:= t2) {
+      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable]
+    } else if (t1 =:= t3) {
+      val kt = tpe.typeArgs.head
+      val vt = tpe.typeArgs(1)
+      kt =:= typeOf[Int] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable])
+    } else {
+      false
+    }
   }
 
   def isSerLongKeyMap(tpe: Type): Boolean = {
     val t1 = tpe.typeSymbol.asClass.toType
     val t2 = typeOf[Long2ObjectOpenHashMap[_]].typeSymbol.asClass.toType
-    t1 =:= t2 && tpe.typeArgs.head <:< typeOf[Serialize]
+    val t3 = typeOf[FastHashMap[Long, _]].typeSymbol.asClass.toType
+
+    if (t1 =:= t2) {
+      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable]
+    } else if (t1 =:= t3) {
+      val kt = tpe.typeArgs.head
+      val vt = tpe.typeArgs(1)
+      kt =:= typeOf[Long] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable])
+    } else {
+      false
+    }
+  }
+
+  def isSerFastHashMap(tpe: Type): Boolean = {
+    val t1 = tpe.typeSymbol.asClass.toType
+    val t2 = typeOf[FastHashMap[_, _]].typeSymbol.asClass.toType
+    t1 =:= t2
   }
 
   def isVector(tpe: Type): Boolean = tpe <:< typeOf[Vector]

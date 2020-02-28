@@ -4,7 +4,7 @@ import java.util
 
 import com.tencent.angel.PartitionKey
 import com.tencent.angel.graph.VertexId
-import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Splitter}
+import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Singular, Splitter}
 import com.tencent.angel.graph.core.psf.utils.ParamSerDe
 import com.tencent.angel.graph.utils.{GUtils, SerDe}
 import com.tencent.angel.ml.matrix.psf.update.base.{PartitionUpdateParam, UpdateParam}

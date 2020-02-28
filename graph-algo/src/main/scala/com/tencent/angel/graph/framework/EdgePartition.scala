@@ -1,13 +1,22 @@
 package com.tencent.angel.graph.framework
 
+import java.util.concurrent.Future
+
+import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx}
+import com.tencent.angel.graph.core.psf.get.GetPSF
+import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
+import com.tencent.angel.graph.utils.psfConverters._
 import com.tencent.angel.graph.utils.{BitSet, FastHashMap}
 import com.tencent.angel.graph.{VertexId, VertexSet}
+import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
+import com.tencent.angel.spark.models.PSMatrix
 
 import scala.reflect._
+import scala.reflect.runtime.universe.TypeTag
 import scala.{specialized => spec}
 
-class EdgePartition[VD: ClassTag,
+class EdgePartition[VD: ClassTag : TypeTag,
 @spec(Int, Long, Float, Double) ED: ClassTag](val localSrcIds: Array[Int],
                                               val localDstIds: Array[Int],
                                               val data: Array[ED],
@@ -15,6 +24,7 @@ class EdgePartition[VD: ClassTag,
                                               val global2local: FastHashMap[VertexId, Int],
                                               val local2global: Array[VertexId],
                                               val vertexAttrs: Array[VD],
+                                              val localDegreeHist: Array[Int],
                                               val activeSet: Option[VertexSet]) extends Serializable {
 
   val size: Int = localSrcIds.length
@@ -67,7 +77,7 @@ class EdgePartition[VD: ClassTag,
 
   def withData[ED2: ClassTag](newData: Array[ED2]): EdgePartition[VD, ED2] = {
     new EdgePartition[VD, ED2](localSrcIds, localDstIds, newData, index,
-      global2local, local2global, vertexAttrs, activeSet)
+      global2local, local2global, vertexAttrs, localDegreeHist, activeSet)
   }
 
   def withActiveSet(iter: Iterator[VertexId]): EdgePartition[VD, ED] = {
@@ -76,7 +86,7 @@ class EdgePartition[VD: ClassTag,
       activeSet.add(iter.next())
     }
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, vertexAttrs, Some(activeSet))
+      global2local, local2global, vertexAttrs, localDegreeHist, Some(activeSet))
   }
 
   def updateVertices(iter: Iterator[(VertexId, VD)]): EdgePartition[VD, ED] = {
@@ -87,13 +97,13 @@ class EdgePartition[VD: ClassTag,
       newVertexAttrs(global2local(kv._1)) = kv._2
     }
     new EdgePartition[VD, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, newVertexAttrs, activeSet)
+      global2local, local2global, newVertexAttrs, localDegreeHist, activeSet)
   }
 
-  def withoutVertexAttributes[VD2: ClassTag](): EdgePartition[VD2, ED] = {
+  def withoutVertexAttributes[VD2: ClassTag : TypeTag](): EdgePartition[VD2, ED] = {
     val newVertexAttrs = new Array[VD2](vertexAttrs.length)
     new EdgePartition[VD2, ED](localSrcIds, localDstIds, data, index,
-      global2local, local2global, newVertexAttrs, activeSet)
+      global2local, local2global, newVertexAttrs, localDegreeHist, activeSet)
   }
 
   def map[ED2: ClassTag](f: Edge[ED] => ED2): EdgePartition[VD, ED2] = {
@@ -121,7 +131,7 @@ class EdgePartition[VD: ClassTag,
 
   def reverse: EdgePartition[VD, ED] = {
     val builder = new ExistingEdgePartitionBuilder[VD, ED](
-      global2local, local2global, vertexAttrs, activeSet, size)
+      global2local, local2global, vertexAttrs, localDegreeHist, activeSet, size)
     var pos = 0
     while (pos < size) {
       builder.add(edgeWithLocalIdsFromPos(pos))
@@ -152,7 +162,7 @@ class EdgePartition[VD: ClassTag,
   // for deduplicate
   def groupEdges(merge: (ED, ED) => ED): EdgePartition[VD, ED] = {
     val builder = new ExistingEdgePartitionBuilder[VD, ED](
-      global2local, local2global, vertexAttrs, activeSet)
+      global2local, local2global, vertexAttrs, localDegreeHist, activeSet)
     var currSrcId: VertexId = null.asInstanceOf[VertexId]
     var currDstId: VertexId = null.asInstanceOf[VertexId]
     var currAttr: ED = null.asInstanceOf[ED]
@@ -191,7 +201,7 @@ class EdgePartition[VD: ClassTag,
   def innerJoin[ED2: ClassTag, ED3: ClassTag](other: EdgePartition[_, ED2])
                                              (f: (VertexId, VertexId, ED, ED2) => ED3): EdgePartition[VD, ED3] = {
     val builder = new ExistingEdgePartitionBuilder[VD, ED3](
-      global2local, local2global, vertexAttrs, activeSet)
+      global2local, local2global, vertexAttrs, localDegreeHist, activeSet)
     var i = 0
     var j = 0
     // For i = index of each edge in `this`...
@@ -255,57 +265,202 @@ class EdgePartition[VD: ClassTag,
     }
   }
 
-  def aggregateMessagesScan[A: ClassTag](sendMsg: EdgeContext[VD, ED, A] => Unit,
-                                         mergeMsg: (A, A) => A,
-                                         tripletFields: TripletFields,
-                                         activeness: EdgeActiveness): Iterator[(VertexId, A)] = {
-    /*
+  private var updateActiveSetPSF: GetPSF[Array[VertexId]] = _
+
+  private def createUpdateActiveSet(psMatrix: PSMatrix): GetPSF[Array[VertexId]] = {
+    psMatrix.createGet { ctx: PSFGUCtx =>
+      val param = ctx.getArrayParam
+      val partition = ctx.getPartition[VD]
+
+      param.filter(vid => partition.isMask(vid))
+    } { ctx: PSFMCtx =>
+      val last = ctx.getLast[Array[VertexId]]
+      val curr = ctx.getCurr[Array[VertexId]]
+
+      if (last != null && last.nonEmpty) {
+        if (curr != null && curr.nonEmpty) {
+          val newArray = new Array[VertexId](last.length + curr.length)
+          Array.copy(last, 0, newArray, 0, last.length)
+          Array.copy(curr, 0, newArray, last.length, curr.length)
+          newArray
+        } else {
+          last
+        }
+      } else {
+        curr
+      }
+    }
+  }
+
+  def updateActiveSet(psMatrix: PSMatrix, batchSize: Int = -1): this.type = {
+    if (updateActiveSetPSF == null) {
+      updateActiveSetPSF = createUpdateActiveSet(psMatrix)
+    }
+
+    activeSet.foreach {
+      case setValue: VertexSet =>
+        setValue.clear()
+        val active = if (batchSize > 0) {
+          updateActiveSetPSF(local2global, Array.empty[VertexId], batchSize)
+        } else {
+          updateActiveSetPSF(local2global, Array.empty[VertexId])
+        }
+        active.foreach(vid => setValue.add(vid))
+      case _ =>
+    }
+
+    this
+  }
+
+  private var pullNodeAttrPSF: GetPSF[FastHashMap[VertexId, VD]] = _
+
+  private def pullNodeAttr(psMatrix: PSMatrix): GetPSF[FastHashMap[VertexId, VD]] = {
+    psMatrix.createGet { ctx: PSFGUCtx =>
+      val param = ctx.getArrayParam
+      val partition = ctx.getPartition[VD]
+      val map = new FastHashMap[VertexId, VD](param.length)
+      param.foreach { vid => map(vid) = partition.getAttr(vid) }
+      map
+    } { ctx: PSFMCtx =>
+      val last = ctx.getLast[FastHashMap[VertexId, VD]]
+      val curr = ctx.getCurr[FastHashMap[VertexId, VD]]
+
+      curr.foreach { case (vid, attr) => last(vid) = attr }
+      last
+    }
+  }
+
+  def partialUpdateLocalVertexAttrs(psMatrix: PSMatrix, vids: Array[VertexId], batchSize: Int = -1): this.type = {
+    if (pullNodeAttrPSF == null) {
+      pullNodeAttrPSF = pullNodeAttr(psMatrix)
+    }
+
+    var result = new FastHashMap[VertexId, VD](vids.length)
+    result = if (batchSize > 0) {
+      pullNodeAttrPSF(vids, result, batchSize)
+    } else {
+      pullNodeAttrPSF(vids, result)
+    }
+    result.foreach { case (vid, attr) =>
+      vertexAttrs(global2local(vid)) = attr
+    }
+
+    this
+  }
+
+  def updateLocalVertexAttrs(psMatrix: PSMatrix, batchSize: Int = -1): this.type = {
+    if (pullNodeAttrPSF == null) {
+      pullNodeAttrPSF = pullNodeAttr(psMatrix)
+    }
+
+    var result = new FastHashMap[VertexId, VD](local2global.length)
+    result = if (batchSize > 0) {
+      pullNodeAttrPSF(local2global, result, batchSize)
+    } else {
+      pullNodeAttrPSF(local2global, result)
+    }
+    result.foreach { case (vid, attr) =>
+      vertexAttrs(global2local(vid)) = attr
+    }
+
+    this
+  }
+
+  private var updateRemoteVertexAttr: UpdatePSF = _
+
+  private def createUpdateRemoteVertexAttr[A: ClassTag](psMatrix: PSMatrix,
+                                                        mergeMsg: (A, A) => A): UpdatePSF = {
+    psMatrix.createUpdate { ctx: PSFGUCtx =>
+      val param = ctx.getMapParam[A]
+      val partition = ctx.getPartition[VD]
+
+      param.foreach { case (vid, msg) => partition.mergeMessage[A](vid, msg, mergeMsg) }
+    }
+  }
+
+  def sendMessage[A: ClassTag : TypeTag](psMatrix: PSMatrix, msgs: Array[A], selected: BitSet,
+                                         mergeMsg: (A, A) => A, batchSize: Int = -1): this.type = {
+    if (updateRemoteVertexAttr == null) {
+      updateRemoteVertexAttr = createUpdateRemoteVertexAttr(psMatrix, mergeMsg)
+    }
+
+    val sendData = new FastHashMap[VertexId, A](selected.capacity)
+
+    selected.iterator.foreach { pos => sendData(local2global(pos)) = msgs(pos) }
+    if (batchSize > 0) {
+      updateRemoteVertexAttr(sendData, batchSize)
+    } else {
+      updateRemoteVertexAttr(sendData)
+    }
+
+    this
+  }
+
+  def asyncSendMessage[A: ClassTag : TypeTag](psMatrix: PSMatrix, msgs: Array[A], selected: BitSet,
+                                              mergeMsg: (A, A) => A, batchSize: Int = -1): Future[VoidResult] = {
+    if (updateRemoteVertexAttr == null) {
+      updateRemoteVertexAttr = createUpdateRemoteVertexAttr(psMatrix, mergeMsg)
+    }
+
+    val sendData = new FastHashMap[VertexId, A](selected.capacity)
+
+    selected.iterator.foreach { pos => sendData(local2global(pos)) = msgs(pos) }
+    if (batchSize > 0) {
+      updateRemoteVertexAttr.async(sendData, batchSize)
+    } else {
+      updateRemoteVertexAttr.async(sendData)
+    }
+  }
+
+  def aggregateMessagesScan[A: ClassTag : TypeTag](sendMsg: EdgeContext[VD, ED, A] => Unit,
+                                                   mergeMsg: (A, A) => A,
+                                                   tripletFields: TripletFields,
+                                                   activeness: EdgeActiveness,
+                                                   batchSize: Int = -1): Iterator[(VertexId, A)] = {
+
     val aggregates = new Array[A](vertexAttrs.length)
-    val bitset = new BitSet(vertexAttrs.length)
+    val bitSet = new BitSet(vertexAttrs.length)
 
-    val ctx = new AggregatingEdgeContext[VD, ED, A](mergeMsg, aggregates, bitset)
-    index.iterator.foreach { cluster =>
-      val clusterSrcId = cluster._1
-      val clusterPos = cluster._2
-      val clusterLocalSrcId = localSrcIds(clusterPos)
+    val ctx = new AggregatingEdgeContext[VD, ED, A](mergeMsg, aggregates, bitSet)
 
+    index.iterator.foreach { case (clusterId: VertexId, (clusterPos: Int, clusterLen: Int)) =>
       val scanCluster =
         if (activeness == EdgeActiveness.Neither) true
-        else if (activeness == EdgeActiveness.SrcOnly) isActive(clusterSrcId)
+        else if (activeness == EdgeActiveness.SrcOnly) isActive(clusterId)
         else if (activeness == EdgeActiveness.DstOnly) true
-        else if (activeness == EdgeActiveness.Both) isActive(clusterSrcId)
+        else if (activeness == EdgeActiveness.Both) isActive(clusterId)
         else if (activeness == EdgeActiveness.Either) true
         else throw new Exception("unreachable")
 
       if (scanCluster) {
-        var pos = clusterPos
-        val srcAttr =
-          if (tripletFields.useSrc) vertexAttrs(clusterLocalSrcId) else null.asInstanceOf[VD]
-        ctx.setSrcOnly(clusterSrcId, clusterLocalSrcId, srcAttr)
-        while (pos < size && localSrcIds(pos) == clusterLocalSrcId) {
+        (clusterPos until clusterPos + clusterLen).foreach { pos =>
+          val localSrcId = localSrcIds(pos)
+          val srcId = local2global(localSrcId)
           val localDstId = localDstIds(pos)
           val dstId = local2global(localDstId)
+          val nonClusterId = if (clusterId == srcId) dstId else srcId
           val edgeIsActive =
             if (activeness == EdgeActiveness.Neither) true
             else if (activeness == EdgeActiveness.SrcOnly) true
-            else if (activeness == EdgeActiveness.DstOnly) isActive(dstId)
-            else if (activeness == EdgeActiveness.Both) isActive(dstId)
-            else if (activeness == EdgeActiveness.Either) isActive(clusterSrcId) || isActive(dstId)
+            else if (activeness == EdgeActiveness.DstOnly) isActive(nonClusterId)
+            else if (activeness == EdgeActiveness.Both) isActive(nonClusterId)
+            else if (activeness == EdgeActiveness.Either) isActive(clusterId) || isActive(nonClusterId)
             else throw new Exception("unreachable")
+
           if (edgeIsActive) {
+            val srcAttr =
+              if (tripletFields.useSrc) vertexAttrs(localSrcId) else null.asInstanceOf[VD]
             val dstAttr =
               if (tripletFields.useDst) vertexAttrs(localDstId) else null.asInstanceOf[VD]
-            ctx.setRest(dstId, localDstId, dstAttr, data(pos))
+            ctx.set(dstId, dstId, localSrcId, localDstId, srcAttr, dstAttr, data(pos))
             sendMsg(ctx)
           }
-          pos += 1
         }
       }
     }
 
-    bitset.iterator.map { localId => (local2global(localId), aggregates(localId)) }
+    bitSet.iterator.map { localId => (local2global(localId), aggregates(localId)) }
 
-     */
 
     null
   }

@@ -18,6 +18,12 @@
             <artifactId>angel-ps-mllib</artifactId>
             <version>2.4.0</version>
         </dependency>
+        <!--dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>4.1.39.Final</version>
+            <scope>compile</scope>
+        </dependency-->
     </dependencies>
 
     <build>

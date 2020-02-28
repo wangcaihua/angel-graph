@@ -2,7 +2,7 @@ package com.tencent.angel.graph.core.psf.common
 
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.PSPartition
-import com.tencent.angel.graph.utils.FastHashMap
+import com.tencent.angel.graph.utils.{FastHashMap, GUtils}
 import com.tencent.angel.ps.PSContext
 
 import scala.reflect.ClassTag
@@ -18,7 +18,11 @@ case class PSFGUCtx(psContext: PSContext, matrixId: Int, partitionId: Int,
   }
 
   def getMapParam[V: ClassTag]: FastHashMap[VertexId, V] = {
-    FastHashMap.fromUnimi[VertexId, V](param)
+    if (GUtils.isSerFastHashMap(tpe)) {
+      param.asInstanceOf[FastHashMap[VertexId, V]]
+    } else {
+      FastHashMap.fromUnimi[VertexId, V](param)
+    }
   }
 
   def getArrayParam: Array[VertexId] = {

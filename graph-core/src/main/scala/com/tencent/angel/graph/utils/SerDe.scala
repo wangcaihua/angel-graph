@@ -3,6 +3,7 @@ package com.tencent.angel.graph.utils
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import com.tencent.angel.common.Serialize
+import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.storage._
 import com.tencent.angel.ml.math2.vector._
 import io.netty.buffer.{ByteBuf, Unpooled}
@@ -299,6 +300,8 @@ object SerDe {
       byteBuf.writeInt(0)
     } else {
       map match {
+        case fast: FastHashMap[_, _] =>
+          fast.serialize(byteBuf)
         case i2bo: Int2BooleanArrayMap =>
           byteBuf.writeInt(i2bo.size())
           val iter = i2bo.int2BooleanEntrySet().fastIterator()
@@ -501,6 +504,8 @@ object SerDe {
     var len = 4
     if (map != null) {
       map match {
+        case fast: FastHashMap[_, _] =>
+          len = fast.bufferLen()
         case i2bo: Int2BooleanArrayMap =>
           len += (4 + boolSize) * i2bo.size()
         case i2by: Int2ByteOpenHashMap =>
@@ -623,6 +628,72 @@ object SerDe {
       implicitly[ClassTag[T]].runtimeClass match {
         case t if t == classOf[Int] =>
           map match {
+            case fast: FastHashMap[_, _] =>
+              fast.valueTag match {
+                case vt if vt == classOf[Boolean] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Boolean]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeBoolean(temp(key))
+                  }
+                case vt if vt == classOf[Char] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Char]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeChar(temp(key))
+                  }
+                case vt if vt == classOf[Byte] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Byte]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeByte(temp(key))
+                  }
+                case vt if vt == classOf[Short] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Short]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeShort(temp(key))
+                  }
+                case vt if vt == classOf[Int] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Int]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeInt(temp(key))
+                  }
+                case vt if vt == classOf[Long] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Long]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeLong(temp(key))
+                  }
+                case vt if vt == classOf[Float] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Float]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeFloat(temp(key))
+                  }
+                case vt if vt == classOf[Double] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, Double]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key).writeDouble(temp(key))
+                  }
+                case vt if classOf[GData].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    val value = temp(key).asInstanceOf[GData]
+                    byteBuf.writeInt(key)
+                    value.serialize(byteBuf)
+                  }
+                case vt if classOf[Serializable].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key)
+                    javaSerialize(temp(key), byteBuf)
+                  }
+              }
             case i2bo: Int2BooleanOpenHashMap =>
               (start until end).foreach { idx =>
                 val key = keys(idx).asInstanceOf[Int]
@@ -708,6 +779,72 @@ object SerDe {
           }
         case t if t == classOf[Long] =>
           map match {
+            case fast: FastHashMap[_, _] =>
+              fast.valueTag match {
+                case vt if vt == classOf[Boolean] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Boolean]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeBoolean(temp(key))
+                  }
+                case vt if vt == classOf[Char] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Char]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeChar(temp(key))
+                  }
+                case vt if vt == classOf[Byte] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Byte]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeByte(temp(key))
+                  }
+                case vt if vt == classOf[Short] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Short]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeShort(temp(key))
+                  }
+                case vt if vt == classOf[Int] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Int]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeInt(temp(key))
+                  }
+                case vt if vt == classOf[Long] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Long]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeLong(temp(key))
+                  }
+                case vt if vt == classOf[Float] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Float]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeFloat(temp(key))
+                  }
+                case vt if vt == classOf[Double] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, Double]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key).writeDouble(temp(key))
+                  }
+                case vt if classOf[GData].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    val value = temp(key).asInstanceOf[GData]
+                    byteBuf.writeLong(key)
+                    value.serialize(byteBuf)
+                  }
+                case vt if classOf[Serializable].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key)
+                    javaSerialize(temp(key), byteBuf)
+                  }
+              }
             case l2by: Long2BooleanOpenHashMap =>
               (start until end).foreach { idx =>
                 val key = keys(idx).asInstanceOf[Long]
@@ -803,6 +940,37 @@ object SerDe {
       implicitly[ClassTag[T]].runtimeClass match {
         case t if t == classOf[Int] =>
           map match {
+            case fast: FastHashMap[_, _] =>
+              fast.valueTag match {
+                case vt if vt == classOf[Boolean] =>
+                  len += (4 + boolSize) * (end - start)
+                case vt if vt == classOf[Byte] =>
+                  len += 5 * (end - start)
+                case vt if vt == classOf[Char] =>
+                  len += (4 + charSize) * (end - start)
+                case vt if vt == classOf[Short] =>
+                  len += (4 + shortSize) * (end - start)
+                case vt if vt == classOf[Int] =>
+                  len += 8 * (end - start)
+                case vt if vt == classOf[Long] =>
+                  len += 12 * (end - start)
+                case vt if vt == classOf[Float] =>
+                  len += 8 * (end - start)
+                case vt if vt == classOf[Double] =>
+                  len += 12 * (end - start)
+                case vt if classOf[GData].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach{ idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    len += 4 + temp(key).asInstanceOf[GData].bufferLen()
+                  }
+                case vt if classOf[Serializable].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach{ idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    len += 4 + javaSerBufferSize(temp(key))
+                  }
+              }
             case _: Int2BooleanOpenHashMap =>
               len += (4 + boolSize) * (end - start)
             case _: Int2ByteOpenHashMap =>
@@ -861,6 +1029,37 @@ object SerDe {
           }
         case t if t == classOf[Long] =>
           map match {
+            case fast: FastHashMap[_,_] =>
+              fast.valueTag match {
+                case vt if vt == classOf[Boolean] =>
+                  len += (8 + boolSize) * (end - start)
+                case vt if vt == classOf[Byte] =>
+                  len += 9 * (end - start)
+                case vt if vt == classOf[Char] =>
+                  len += (8 + charSize) * (end - start)
+                case vt if vt == classOf[Short] =>
+                  len += (8 + shortSize) * (end - start)
+                case vt if vt == classOf[Int] =>
+                  len += 12 * (end - start)
+                case vt if vt == classOf[Long] =>
+                  len += 16 * (end - start)
+                case vt if vt == classOf[Float] =>
+                  len += 12 * (end - start)
+                case vt if vt == classOf[Double] =>
+                  len += 18 * (end - start)
+                case vt if classOf[GData].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach{ idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    len += 8 + temp(key).asInstanceOf[GData].bufferLen()
+                  }
+                case vt if classOf[Serializable].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach{ idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    len += 8 + javaSerBufferSize(temp(key))
+                  }                  
+              }
             case _: Long2BooleanOpenHashMap =>
               len += (8 + boolSize) * (end - start)
             case _: Long2ByteOpenHashMap =>
@@ -927,9 +1126,13 @@ object SerDe {
     fastMapFromBuffer(typeOf[T], byteBuf).asInstanceOf[T]
   }
 
-  def fastMapFromBuffer(tpy: Type, byteBuf: ByteBuf): Any = {
+  def fastMapFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
     val size = byteBuf.readInt()
-    tpy match {
+    tpe match {
+      case tp if GUtils.isSerFastHashMap(tp) =>
+        val fast = ReflectUtils.newInstance(tp).asInstanceOf[FastHashMap[_, _]]
+        fast.deserialize(byteBuf)
+        fast
       case tp if tp =:= typeOf[Int2BooleanOpenHashMap] =>
         val res = new Int2BooleanOpenHashMap(size)
         (0 until size).foreach { _ =>
