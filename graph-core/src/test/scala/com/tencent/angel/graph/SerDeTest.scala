@@ -1,7 +1,9 @@
 package com.tencent.angel.graph
 
 
-import com.tencent.angel.graph.utils.{ReflectUtils, SerDe}
+import com.tencent.angel.graph.core.data.GData
+import com.tencent.angel.graph.utils.ReflectUtils.getMethod
+import com.tencent.angel.graph.utils.{FastHashMap, ReflectUtils, SerDe}
 import com.tencent.angel.ml.math2.VFactory
 import io.netty.buffer.{ByteBuf, Unpooled}
 import it.unimi.dsi.fastutil.ints._
@@ -9,10 +11,21 @@ import it.unimi.dsi.fastutil.longs._
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.util.Random
+import scala.reflect.runtime.universe._
 
+case class ABC(i: Int, d: Array[Int], fast: FastHashMap[Int, Array[Double]]) extends GData {
+  def this() = this(0, null, null)
+}
+
+class ABCD[T](val i: Int, val f: T) extends GData {
+  def this() = this(0, null.asInstanceOf[T])
+}
+
+class DEF(val d: Double) extends Serializable
 
 class SerDeTest extends AnyFunSuite {
   val directBuf: ByteBuf = Unpooled.buffer(2048)
+  val rand = new Random()
 
   test("primitive") {
     val bo = true
@@ -193,11 +206,64 @@ class SerDeTest extends AnyFunSuite {
     allVectors.foreach{ vec => SerDe.serVector(vec, directBuf)}
 
     allVectors.foreach{ vec =>
-      val tpe = ReflectUtils.typeFromObject(vec)
+      val tpe = ReflectUtils.getType(vec)
       val desered = SerDe.vectorFromBuffer(tpe, directBuf)
     }
 
     print("OK")
+  }
+
+  test("FastHashMap1"){
+    val i2d = new FastHashMap[Int, Double](10)
+    (0 until 100).foreach{ _ =>
+      i2d(rand.nextInt()) = rand.nextDouble()
+    }
+
+    i2d.serialize(directBuf)
+
+    val i2d2 = new FastHashMap[Int, Double](10)
+    i2d2.deserialize(directBuf)
+    i2d.foreach{ case (k, v) => assert((v - i2d2(k)) < 1e-10)}
+    println("OK")
+  }
+
+  test("FastHashMap2") {
+    val i2d = new FastHashMap[Int, Array[Double]](10)
+    (0 until 100).foreach { _ =>
+      i2d(rand.nextInt()) = Array.tabulate[Double](rand.nextInt(20)+1){ _ => rand.nextDouble()}
+    }
+
+    i2d.serialize(directBuf)
+
+    val i2d2 = new FastHashMap[Int, Array[Double]](10)
+    i2d2.deserialize(directBuf)
+    i2d.foreach { case (k, v) => v.zip(i2d2(k)).foreach{ case (x, y) => assert( (x - y)< 1e-10) } }
+    println("OK")
+  }
+
+  test("FastHashMap3") {
+    val i2d = new FastHashMap[Int, ABCD[Float]](10)
+    val tpe = typeOf[FastHashMap[Int, ABCD[Float]]]
+
+    val i2d2 = ReflectUtils.newFastHashMap(tpe)
+
+    println("OK")
+  }
+
+  test("FastHashMap4") {
+    val map = new FastHashMap[Int, Array[Double]](10)
+    map(3) = Array(8.0, 8.8)
+    map(4) = Array(43.0, 7.5)
+    map(7) = Array(4.0, 5.35)
+    map(12) = Array(3.0, 4.67)
+    map(17) = Array(3.0, 8.42)
+    val abc = ABC(5, Array(2, 3, 4, 5), map)
+
+    SerDe.serialize(abc, directBuf)
+    val abc2 = new ABC()
+    SerDe.deserialize(abc2, directBuf)
+
+    println("OK")
   }
 
 }

@@ -4,10 +4,11 @@ package com.tencent.angel.graph.framework
 import java.util.UUID
 
 import com.tencent.angel.graph._
-import com.tencent.angel.graph.core.psf.common.PSFGUCtx
+import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx, Singular}
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
-import com.tencent.angel.graph.utils.PSFUtils
+import com.tencent.angel.graph.utils.{FastHashMap, PSFUtils, ReflectUtils}
 import com.tencent.angel.graph.utils.psfConverters._
+import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.spark.models.PSMatrix
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
@@ -21,8 +22,6 @@ import scala.reflect.runtime.universe._
 
 class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) extends Serializable {
   private val psMatrixName = s"PSPartition_${UUID.randomUUID()}"
-  var vertices: RDD[NodePartition[VD]] = _
-
   lazy val maxVertexId: VertexId = edges.mapPartitions { iter =>
     val part = iter.next()
     Iterator.single(part.maxVertexId)
@@ -56,8 +55,42 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     psMatrix
   }
 
+  val numPsPartition: Int = PSAgentContext.get.getMatrixMetaManager
+    .getPartitions(psVertices.id).size()
+
+  var vertices: RDD[NodePartition[VD]] = edges.sparkContext
+    .parallelize(0 until numPsPartition, numPsPartition).mapPartitions{ iter =>
+    val partId = iter.next()
+
+    val pullAttr = psVertices.createGet{ ctx: PSFGUCtx =>
+      val pid = ctx.getParam[Singular]
+      assert(pid.partition == ctx.partitionId)
+
+      val partition = ctx.getPartition[VD]
+
+      val result = new FastHashMap[VertexId, VD](partition.local2global.length)
+      partition.local2global.foreach{ vid => result(vid) = partition.getAttr(vid) }
+      result
+    } { ctx: PSFMCtx =>
+      val last = ctx.getLast[FastHashMap[VertexId, VD]]
+      val curr = ctx.getCurr[FastHashMap[VertexId, VD]]
+
+      curr.foreach{ case (k, v) => last(k) = v}
+
+      last
+    }
+
+    val attrs = pullAttr(Singular(partId))
+    pullAttr.clear()
+
+    val nodePartition = new NodePartition[VD](attrs)
+    Iterator.single(nodePartition)
+  }
+
   def untypedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
     edges.foreachPartition { iter =>
+      Neighbor.register()
+
       val edgePartition = iter.next()
 
       // 1. create Adjacency in spark RDD partition
@@ -134,6 +167,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
 
   def typedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
     edges.foreachPartition { iter =>
+      Neighbor.register()
       val edgePartition = iter.next()
 
       // 1. create Adjacency in spark RDD partition

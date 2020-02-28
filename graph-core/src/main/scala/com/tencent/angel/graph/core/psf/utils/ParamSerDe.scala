@@ -1,6 +1,7 @@
 package com.tencent.angel.graph.core.psf.utils
 
 import com.tencent.angel.common.Serialize
+import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Splitter}
 import com.tencent.angel.graph.utils.{GUtils, ReflectUtils, SerDe}
 import io.netty.buffer.ByteBuf
@@ -9,9 +10,10 @@ import scala.reflect.runtime.universe._
 
 object ParamSerDe {
 
-  def serializeSplit(splitter: Splitter, tpe: Type, params: Any, buf: ByteBuf): Unit = {
-    SerDe.serPrimitive(tpe.toString, buf)
+  def serializeSplit(splitter: Splitter, tt: TypeTag[_], params: Any, buf: ByteBuf): Unit = {
+    SerDe.javaSerialize(tt, buf)
 
+    val tpe = tt.tpe
     splitter match {
       case split: RangeSplitter =>
         if (GUtils.isPrimitiveArray(tpe)) {
@@ -24,8 +26,10 @@ object ParamSerDe {
       case _: NonSplitter =>
         if (GUtils.isPrimitive(tpe)) {
           SerDe.serPrimitive(params, buf)
-        } else if (tpe <:< typeOf[Serialize]) {
-          params.asInstanceOf[Serialize].serialize(buf)
+        } else if (tpe <:< typeOf[Serializable]) {
+          SerDe.javaSerialize(params, buf)
+        } else if (tpe <:< typeOf[GData]) {
+          params.asInstanceOf[GData].serialize(buf)
         } else {
           try {
             SerDe.serialize(params, buf)
@@ -36,8 +40,9 @@ object ParamSerDe {
     }
   }
 
-  def deserializeSplit(buf: ByteBuf): (Type, Any) = {
-    val tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](buf))
+  def deserializeSplit(buf: ByteBuf): (TypeTag[_], Any) = {
+    val tt = SerDe.javaDeserialize[TypeTag[_]](buf)
+    val tpe = tt.tpe
 
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)
@@ -45,9 +50,11 @@ object ParamSerDe {
       SerDe.arrFromBuffer(tpe.typeArgs.head, buf)
     } else if (GUtils.isFastMap(tpe)) {
       SerDe.fastMapFromBuffer(tpe, buf)
-    } else if (tpe <:< typeOf[Serialize]) {
+    } else if (tpe <:< typeOf[Serializable]) {
+      SerDe.javaDeserialize[Any](buf)
+    } else if (tpe <:< typeOf[GData]) {
       val tmp = ReflectUtils.newInstance(tpe)
-      tmp.asInstanceOf[Serialize].deserialize(buf)
+      tmp.asInstanceOf[GData].deserialize(buf)
       tmp
     } else {
       try {
@@ -59,13 +66,14 @@ object ParamSerDe {
       }
     }
 
-    (tpe, params)
+    (tt, params)
   }
 
-  def bufferLenSplit(splitter: Splitter, tpe: Type, params: Any): Int = {
+  def bufferLenSplit(splitter: Splitter, tt: TypeTag[_], params: Any): Int = {
     var len = 0
 
-    len += SerDe.serPrimitiveBufSize(tpe.toString)
+    len += SerDe.javaSerBufferSize(tt)
+    val tpe = tt.tpe
 
     splitter match {
       case split: RangeSplitter =>
@@ -79,7 +87,9 @@ object ParamSerDe {
       case _: NonSplitter =>
         if (GUtils.isPrimitive(tpe)) {
           len += SerDe.serPrimitiveBufSize(params)
-        } else if (tpe <:< typeOf[Serialize]) {
+        } else if (tpe <:< typeOf[Serializable]) {
+          len += SerDe.javaSerBufferSize(params)
+        } else if (tpe <:< typeOf[GData]) {
           len += params.asInstanceOf[Serialize].bufferLen()
         } else {
           try {

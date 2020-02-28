@@ -368,8 +368,8 @@ class EdgePartition[VD: ClassTag : TypeTag,
 
   private var updateRemoteVertexAttr: UpdatePSF = _
 
-  private def createUpdateRemoteVertexAttr[A: ClassTag](psMatrix: PSMatrix,
-                                                        mergeMsg: (A, A) => A): UpdatePSF = {
+  private def createUpdateRemoteVertexAttr[A: ClassTag : TypeTag](psMatrix: PSMatrix,
+                                                                  mergeMsg: (A, A) => A): UpdatePSF = {
     psMatrix.createUpdate { ctx: PSFGUCtx =>
       val param = ctx.getMapParam[A]
       val partition = ctx.getPartition[VD]
@@ -466,7 +466,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
   }
 }
 
-private class AggregatingEdgeContext[VD, ED, A](mergeMsg: (A, A) => A, aggregates: Array[A], bitset: BitSet)
+private class AggregatingEdgeContext[VD, ED, A](mergeMsg: (A, A) => A, aggregates: Array[A], bitSet: BitSet)
   extends EdgeContext[VD, ED, A] {
   private[this] var _localSrcId: Int = _
   private[this] var _localDstId: Int = _
@@ -504,11 +504,11 @@ private class AggregatingEdgeContext[VD, ED, A](mergeMsg: (A, A) => A, aggregate
   }
 
   @inline private def send(localId: Int, msg: A) {
-    if (bitset.get(localId)) {
+    if (bitSet.get(localId)) {
       aggregates(localId) = mergeMsg(aggregates(localId), msg)
     } else {
       aggregates(localId) = msg
-      bitset.set(localId)
+      bitSet.set(localId)
     }
   }
 }

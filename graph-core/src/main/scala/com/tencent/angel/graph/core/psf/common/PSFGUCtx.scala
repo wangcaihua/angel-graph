@@ -17,7 +17,7 @@ case class PSFGUCtx(psContext: PSContext, matrixId: Int, partitionId: Int,
     param.asInstanceOf[T]
   }
 
-  def getMapParam[V: ClassTag]: FastHashMap[VertexId, V] = {
+  def getMapParam[V: ClassTag: TypeTag]: FastHashMap[VertexId, V] = {
     if (GUtils.isSerFastHashMap(tpe)) {
       param.asInstanceOf[FastHashMap[VertexId, V]]
     } else {

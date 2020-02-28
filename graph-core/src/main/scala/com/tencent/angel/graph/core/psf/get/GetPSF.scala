@@ -1,7 +1,6 @@
 package com.tencent.angel.graph.core.psf.get
 
 import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicInteger
 
 import com.tencent.angel.graph.utils.{GUtils, ReflectUtils}
 import com.tencent.angel.ml.matrix.psf.get.base.GetResult
@@ -18,8 +17,6 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
 
   @transient private var matClient: MatrixClient = _
   @transient private var hasBind: Boolean = false
-
-  ReflectUtils.registerType(typeOf[U])
 
   def bind(matClient: MatrixClient): this.type = this.synchronized {
     if (!hasBind) {
@@ -469,41 +466,33 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
     result
   }
 
-  def asyncGet[T: TypeTag](getParam: T, mergeParam: U): (Future[GetResult], Int) = this.synchronized {
+  def asyncGet[T: TypeTag](getParam: T): Future[GetResult] = this.synchronized {
     if (!hasBind) {
       throw new Exception("please init bind a matClient first!")
     }
     assert(GUtils.paramCheck(typeOf[T]))
 
-    val initId = GetPSF.setInit(mergeParam)
-    val param = GGetParam[T](matClient.getMatrixId, getParam, getFuncId, mergeFuncId, initId)
+    val param = GGetParam[T](matClient.getMatrixId, getParam, getFuncId, mergeFuncId)
     val func = new GGetFunc(param)
-    val result = matClient.asyncGet(func)
-    // GetPSF.removeInit(initId)
-
-    result -> initId
+    matClient.asyncGet(func)
   }
 
-  def apply[T: TypeTag](getParam: T, mergeParam: U): U = {
-    GetPSF.getResult[U](asyncGet(getParam, mergeParam))
+  def apply[T: TypeTag](getParam: T): U = {
+    asyncGet(getParam).get().asInstanceOf[GGetResult].value.asInstanceOf[U]
   }
 
-  def asyncGet(mergeParam: U): (Future[GetResult], Int) = this.synchronized {
+  def asyncGet(): Future[GetResult] = this.synchronized {
     if (!hasBind) {
       throw new Exception("please init bind a matClient first!")
     }
 
-    val initId = GetPSF.setInit(mergeParam)
-    val param = GGetParam.empty(matClient.getMatrixId, getFuncId, mergeFuncId, initId)
+    val param = GGetParam.empty(matClient.getMatrixId, getFuncId, mergeFuncId)
     val func = new GGetFunc(param)
-    val result = matClient.asyncGet(func)
-    //GetPSF.removeInit(initId)
-
-    result -> initId
+    matClient.asyncGet(func)
   }
 
-  def apply(mergeParam: U): U = {
-    GetPSF.getResult[U](asyncGet(mergeParam))
+  def apply(): U = {
+    asyncGet().get().asInstanceOf[GGetResult].value.asInstanceOf[U]
   }
 
   def clear(): Unit = this.synchronized {
@@ -516,32 +505,3 @@ class GetPSF[U: TypeTag](getOp: GetOp, mergeOp: MergeOp) extends Serializable {
     hasBind = false
   }
 }
-
-object GetPSF {
-  private val ids = new AtomicInteger(0)
-  private val inits = new Int2ObjectOpenHashMap[Any]()
-
-  def getResult[U](future: (Future[GetResult], Int)): U = {
-    val result = future._1.get().asInstanceOf[GGetResult].value.asInstanceOf[U]
-    GetPSF.removeInit(future._2)
-
-    result
-  }
-
-  def setInit(init: Any): Int = inits.synchronized {
-    val initId = ids.getAndIncrement()
-    inits.put(initId, init)
-    initId
-  }
-
-  def getInit(initId: Int): Any = {
-    inits.get(initId)
-  }
-
-  def removeInit(initId: Int): Unit = inits.synchronized {
-    if (inits.containsKey(initId)) {
-      inits.remove(initId)
-    }
-  }
-}
-

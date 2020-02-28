@@ -6,6 +6,8 @@ import com.tencent.angel.graph.utils.{BitSet, FastHashMap, RefHashMap}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
+
 
 class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
                                 val local2global: Array[VertexId]) {
@@ -72,7 +74,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   }
 
   // slots operations
-  def createSlot[V: ClassTag](name: String): this.type = slotRefMap.synchronized {
+  def createSlot[V: ClassTag: TypeTag](name: String): this.type = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap
@@ -93,7 +95,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     this
   }
 
-  def getOrCreateSlot[V: ClassTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
+  def getOrCreateSlot[V: ClassTag: TypeTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap

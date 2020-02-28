@@ -4,13 +4,23 @@ package com.tencent.angel.graph.framework
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.graph.core.sampler._
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
-import com.tencent.angel.graph.utils.{FastArray, FastHashMap}
+import com.tencent.angel.graph.utils.{FastArray, FastHashMap, ReflectUtils}
 import com.tencent.angel.graph.{VertexId, VertexType, WgtTpe}
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap
 
 import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 trait Neighbor extends GData
+
+object Neighbor {
+  def register(): Unit = {
+    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighN]], new FastHashMap[VertexId, NeighN]())
+    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighNW]], new FastHashMap[VertexId, NeighNW]())
+    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighTN]], new FastHashMap[VertexId, NeighTN]())
+    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighTNW]], new FastHashMap[VertexId, NeighTNW]())
+  }
+}
 
 trait UnTyped {
   def sample(): VertexId
@@ -131,7 +141,7 @@ class UnTypedNeighborBuilder {
   }
 }
 
-class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag]
+class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
 (direction: EdgeDirection, private val neighTable: FastHashMap[VertexId, UnTypedNeighborBuilder]) {
   def this(direction: EdgeDirection) = {
     this(direction, new FastHashMap[VertexId, UnTypedNeighborBuilder]())
@@ -457,7 +467,7 @@ class TypedNeighborBuilder {
   }
 }
 
-class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag]
+class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
 (direction: EdgeDirection, private val neighTable: FastHashMap[VertexId, TypedNeighborBuilder]) {
   def this(direction: EdgeDirection) = {
     this(direction, new FastHashMap[VertexId, TypedNeighborBuilder]())

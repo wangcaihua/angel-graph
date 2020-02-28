@@ -14,15 +14,21 @@ class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
   override def merge(list: util.List[PartitionGetResult]): GetResult = {
     val gpRes = list.get(0).asInstanceOf[GPartitionGetResult]
     val doMerge = MergeOp.get(gpRes.mergeFuncId)
-    val tpe = gpRes.tpe
+    val tpe = gpRes.tt.tpe
 
-    var result: Any = GetPSF.getInit(gpRes.initId)
-    (0 until list.size()).foreach { idx =>
-      val pRes = list.get(idx).asInstanceOf[GPartitionGetResult]
-      result = doMerge(PSFMCtx(tpe, result, pRes.pResult))
+    if (list.size() == 0) {
+      GGetResult(null)
+    } else if (list.size() == 1) {
+      GGetResult(gpRes.pResult)
+    } else {
+      var result: Any = gpRes.pResult
+      (1 until list.size()).foreach { idx =>
+        val pRes = list.get(idx).asInstanceOf[GPartitionGetResult]
+        result = doMerge(PSFMCtx(tpe, result, pRes.pResult))
+      }
+
+      GGetResult(result)
     }
-
-    GGetResult(result)
   }
 
   override def partitionGet(partitionGetParam: PartitionGetParam): PartitionGetResult = {
@@ -33,9 +39,9 @@ class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
 
     row.startRead()
     try {
-      val pgParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
-      val (tpe, pGet) = doGet(pgParam)
-      new GPartitionGetResult(tpe, pGet, pp.mergeFunc.asInstanceOf[Int], pp.initId)
+      val pgParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tt.tpe, pp.params)
+      val (tt, pGet) = doGet(pgParam)
+      new GPartitionGetResult(tt, pGet, pp.mergeFunc.asInstanceOf[Int])
     } finally {
       row.endRead()
     }

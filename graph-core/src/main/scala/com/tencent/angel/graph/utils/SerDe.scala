@@ -3,6 +3,7 @@ package com.tencent.angel.graph.utils
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import com.tencent.angel.common.Serialize
+import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.storage._
 import com.tencent.angel.ml.math2.vector._
@@ -678,6 +679,13 @@ object SerDe {
                     val key = keys(idx).asInstanceOf[Int]
                     byteBuf.writeInt(key).writeDouble(temp(key))
                   }
+                case vt if vt.isArray =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key)
+                    SerDe.serArr(temp(key), byteBuf)
+                  }
                 case vt if classOf[GData].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
                   (start until end).foreach { idx =>
@@ -829,6 +837,13 @@ object SerDe {
                     val key = keys(idx).asInstanceOf[Long]
                     byteBuf.writeLong(key).writeDouble(temp(key))
                   }
+                case vt if vt.isArray =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key)
+                    SerDe.serArr(temp(key), byteBuf)
+                  }
                 case vt if classOf[GData].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Long, _]]
                   (start until end).foreach { idx =>
@@ -958,15 +973,21 @@ object SerDe {
                   len += 8 * (end - start)
                 case vt if vt == classOf[Double] =>
                   len += 12 * (end - start)
+                case vclz if vclz.isArray =>
+                  val temp = map.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    len += 4 + SerDe.serArrBufSize(temp(key))
+                  }
                 case vt if classOf[GData].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
-                  (start until end).foreach{ idx =>
+                  (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Int]
                     len += 4 + temp(key).asInstanceOf[GData].bufferLen()
                   }
                 case vt if classOf[Serializable].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
-                  (start until end).foreach{ idx =>
+                  (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Int]
                     len += 4 + javaSerBufferSize(temp(key))
                   }
@@ -1029,7 +1050,7 @@ object SerDe {
           }
         case t if t == classOf[Long] =>
           map match {
-            case fast: FastHashMap[_,_] =>
+            case fast: FastHashMap[_, _] =>
               fast.valueTag match {
                 case vt if vt == classOf[Boolean] =>
                   len += (8 + boolSize) * (end - start)
@@ -1047,18 +1068,24 @@ object SerDe {
                   len += 12 * (end - start)
                 case vt if vt == classOf[Double] =>
                   len += 18 * (end - start)
+                case vclz if vclz.isArray =>
+                  val temp = map.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    len += 8 + SerDe.serArrBufSize(temp(key))
+                  }
                 case vt if classOf[GData].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Long, _]]
-                  (start until end).foreach{ idx =>
+                  (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Long]
                     len += 8 + temp(key).asInstanceOf[GData].bufferLen()
                   }
                 case vt if classOf[Serializable].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Long, _]]
-                  (start until end).foreach{ idx =>
+                  (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Long]
                     len += 8 + javaSerBufferSize(temp(key))
-                  }                  
+                  }
               }
             case _: Long2BooleanOpenHashMap =>
               len += (8 + boolSize) * (end - start)
@@ -1127,12 +1154,148 @@ object SerDe {
   }
 
   def fastMapFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
-    val size = byteBuf.readInt()
+    val size = if (GUtils.isSerFastHashMap(tpe)) {
+      0
+    } else {
+      byteBuf.readInt()
+    }
+
     tpe match {
-      case tp if GUtils.isSerFastHashMap(tp) =>
-        val fast = ReflectUtils.newInstance(tp).asInstanceOf[FastHashMap[_, _]]
+      case tp if tp =:= typeOf[FastHashMap[Int, Boolean]] =>
+        val fast = new FastHashMap[Int, Boolean]()
         fast.deserialize(byteBuf)
         fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Char]] =>
+        val fast = new FastHashMap[Int, Char]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Byte]] =>
+        val fast = new FastHashMap[Int, Byte]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Short]] =>
+        val fast = new FastHashMap[Int, Short]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Int]] =>
+        val fast = new FastHashMap[Int, Int]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Long]] =>
+        val fast = new FastHashMap[Int, Long]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Float]] =>
+        val fast = new FastHashMap[Int, Float]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Double]] =>
+        val fast = new FastHashMap[Int, Double]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Boolean]]] =>
+        val fast = new FastHashMap[Int, Array[Boolean]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Char]]] =>
+        val fast = new FastHashMap[Int, Array[Char]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Byte]]] =>
+        val fast = new FastHashMap[Int, Array[Byte]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Short]]] =>
+        val fast = new FastHashMap[Int, Array[Short]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Int]]] =>
+        val fast = new FastHashMap[Int, Array[Int]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Long]]] =>
+        val fast = new FastHashMap[Int, Array[Long]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Float]]] =>
+        val fast = new FastHashMap[Int, Array[Float]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, Array[Double]]] =>
+        val fast = new FastHashMap[Int, Array[Double]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Boolean]] =>
+        val fast = new FastHashMap[Long, Boolean]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Char]] =>
+        val fast = new FastHashMap[Long, Char]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Byte]] =>
+        val fast = new FastHashMap[Long, Byte]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Short]] =>
+        val fast = new FastHashMap[Long, Short]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Int]] =>
+        val fast = new FastHashMap[Long, Int]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Long]] =>
+        val fast = new FastHashMap[Long, Long]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Float]] =>
+        val fast = new FastHashMap[Long, Float]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Double]] =>
+        val fast = new FastHashMap[Long, Double]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Boolean]]] =>
+        val fast = new FastHashMap[Long, Array[Boolean]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Char]]] =>
+        val fast = new FastHashMap[Long, Array[Char]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Byte]]] =>
+        val fast = new FastHashMap[Long, Array[Byte]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Short]]] =>
+        val fast = new FastHashMap[Long, Array[Short]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Int]]] =>
+        val fast = new FastHashMap[Long, Array[Int]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Long]]] =>
+        val fast = new FastHashMap[Long, Array[Long]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Float]]] =>
+        val fast = new FastHashMap[Long, Array[Float]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, Array[Double]]] =>
+        val fast = new FastHashMap[Long, Array[Double]]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if GUtils.isSerFastHashMap(tp) =>
+        val vtpe = tp.typeArgs(1)
+        if (vtpe <:< typeOf[GData] || vtpe <:< typeOf[Serializable]) {
+          ReflectUtils.newFastHashMap(tp).deserialize(byteBuf)
+        } else {
+          throw new Exception(s"cannot deserilize ${tp.toString}")
+        }
       case tp if tp =:= typeOf[Int2BooleanOpenHashMap] =>
         val res = new Int2BooleanOpenHashMap(size)
         (0 until size).foreach { _ =>
@@ -1742,14 +1905,14 @@ object SerDe {
       field.typeSignature match {
         case tpe if GUtils.isPrimitive(tpe) =>
           SerDe.serPrimitive(ReflectUtils.field(inst, field).get, byteBuf)
-        case tpe if tpe <:< typeOf[Serialize] =>
-          ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].serialize(byteBuf)
         case tpe if GUtils.isPrimitiveArray(tpe) =>
           SerDe.serArr(ReflectUtils.field(inst, field).get, byteBuf)
         case tpe if GUtils.isFastMap(tpe) =>
           SerDe.serFastMap(ReflectUtils.field(inst, field).get, byteBuf)
         case tpe if GUtils.isVector(tpe) =>
           SerDe.serVector(ReflectUtils.field(inst, field).get.asInstanceOf[Vector], byteBuf)
+        case tpe if tpe <:< typeOf[Serialize] =>
+          ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].serialize(byteBuf)
         case tpe =>
           throw new Exception(s"cannot serialize field ${tpe.toString}")
       }
@@ -1777,10 +1940,6 @@ object SerDe {
         case tpe if GUtils.isPrimitive(tpe) =>
           ReflectUtils.field(inst, field)
             .set(SerDe.primitiveFromBuffer(tpe, byteBuf))
-        case tpe if tpe <:< typeOf[Serialize] =>
-          val node = ReflectUtils.newInstance(tpe).asInstanceOf[Serialize]
-          node.deserialize(byteBuf)
-          ReflectUtils.field(inst, field).set(node)
         case tpe if GUtils.isPrimitiveArray(tpe) =>
           ReflectUtils.field(inst, field)
             .set(SerDe.arrFromBuffer(tpe.typeArgs.head, byteBuf))
@@ -1790,6 +1949,10 @@ object SerDe {
         case tpe if GUtils.isVector(tpe) =>
           ReflectUtils.field(inst, field)
             .set(SerDe.vectorFromBuffer(tpe, byteBuf))
+        case tpe if tpe <:< typeOf[Serialize] =>
+          val node = ReflectUtils.newInstance(tpe).asInstanceOf[Serialize]
+          node.deserialize(byteBuf)
+          ReflectUtils.field(inst, field).set(node)
         case tpe =>
           throw new Exception(s"cannot serialize field ${tpe.toString}")
       }
@@ -1818,14 +1981,14 @@ object SerDe {
       field.typeSignature match {
         case tpe if GUtils.isPrimitive(tpe) =>
           len += SerDe.serPrimitiveBufSize(ReflectUtils.field(inst, field).get)
-        case tpe if tpe <:< typeOf[Serialize] =>
-          len += ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].bufferLen()
         case tpe if GUtils.isPrimitiveArray(tpe) =>
           len += SerDe.serArrBufSize(ReflectUtils.field(inst, field).get)
         case tpe if GUtils.isFastMap(tpe) =>
           len += SerDe.serFastMapBufSize(ReflectUtils.field(inst, field).get)
         case tpe if GUtils.isVector(tpe) =>
           len += SerDe.serVectorBufSize(ReflectUtils.field(inst, field).get.asInstanceOf[Vector])
+        case tpe if tpe <:< typeOf[Serialize] =>
+          len += ReflectUtils.field(inst, field).get.asInstanceOf[Serialize].bufferLen()
         case tpe =>
           throw new Exception(s"cannot serialize field ${tpe.toString}")
       }

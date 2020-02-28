@@ -4,6 +4,7 @@ import java.util
 
 import com.tencent.angel.PartitionKey
 import com.tencent.angel.graph.VertexId
+import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Singular, Splitter}
 import com.tencent.angel.graph.core.psf.utils.ParamSerDe
 import com.tencent.angel.graph.utils.{GUtils, SerDe}
@@ -16,6 +17,8 @@ import scala.reflect.runtime.universe._
 class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: Int)
   extends UpdateParam(mId, uClock) {
 
+  private val typeTag = implicitly[TypeTag[T]]
+
   override def split(): util.List[PartitionUpdateParam] = {
     val tpe = typeOf[T]
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
@@ -27,7 +30,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
 
       splitters.foreach { splitter =>
         val pp = new GPartitionUpdateParam(matrixId, splitter.part, updateClock,
-          splitter, tpe, params, operation)
+          splitter, typeTag, params, operation)
         splits.add(pp)
       }
 
@@ -38,17 +41,24 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
       val splits = new util.ArrayList[PartitionUpdateParam](splitters.size)
       splitters.foreach { splitter =>
         val pp = new GPartitionUpdateParam(matrixId, splitter.part, updateClock,
-          splitter, tpe, params, operation)
+          splitter, typeTag, params, operation)
         splits.add(pp)
       }
 
+      splits
+    } else if (tpe <:< typeOf[Singular]) {
+      val splits = new util.ArrayList[PartitionUpdateParam](1)
+      val idx = params.asInstanceOf[Singular].partition
+      val pp = new GPartitionUpdateParam(matrixId, parts.get(idx), updateClock,
+        NonSplitter(), typeTag, params, operation)
+      splits.add(pp)
       splits
     } else {
       try {
         val splits = new util.ArrayList[PartitionUpdateParam](parts.size)
         (0 until parts.size()).foreach { idx =>
           val pp = new GPartitionUpdateParam(matrixId, parts.get(idx), updateClock,
-            NonSplitter(), tpe, params, operation)
+            NonSplitter(), typeTag, params, operation)
           splits.add(pp)
         }
 
@@ -79,15 +89,14 @@ object GUpdateParam {
 }
 
 class GPartitionUpdateParam(mId: Int, part: PartitionKey, uClock: Boolean,
-                            splitter: Splitter, var tpe: Type, var params: Any, var operation: Any)
+                            splitter: Splitter, var tt: TypeTag[_], var params: Any, var operation: Any)
   extends PartitionUpdateParam(mId, part, uClock) {
 
-  def this() = this(0, null.asInstanceOf[PartitionKey], false,
-    null.asInstanceOf[Splitter], null.asInstanceOf[Type], null, null)
+  def this() = this(0, null, false, null, null, null, null)
 
   override def serialize(buf: ByteBuf): Unit = {
     super.serialize(buf)
-    ParamSerDe.serializeSplit(splitter, tpe, params, buf)
+    ParamSerDe.serializeSplit(splitter, tt, params, buf)
 
     val dataObj = UpdateOp.get(operation.asInstanceOf[Int])
     buf.writeInt(dataObj.length).writeBytes(dataObj)
@@ -97,14 +106,14 @@ class GPartitionUpdateParam(mId: Int, part: PartitionKey, uClock: Boolean,
     super.deserialize(buf)
     val (t, p) = ParamSerDe.deserializeSplit(buf)
 
-    tpe = t
+    tt = t
     params = p
     operation = SerDe.javaDeserialize[UpdateOp](buf)
   }
 
   override def bufferLen(): Int = {
     var len = super.bufferLen()
-    len += ParamSerDe.bufferLenSplit(splitter, tpe, params)
+    len += ParamSerDe.bufferLenSplit(splitter, tt, params)
     len += UpdateOp.get(operation.asInstanceOf[Int]).length + 4
 
     len

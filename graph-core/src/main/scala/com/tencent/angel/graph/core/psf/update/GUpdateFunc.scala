@@ -15,7 +15,7 @@ class GUpdateFunc(uParam: UpdateParam) extends UpdateFunc(uParam) {
 
     row.startWrite()
     try {
-      val puParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
+      val puParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tt.tpe, pp.params)
       updateOp(puParam)
     } finally {
       row.endWrite()

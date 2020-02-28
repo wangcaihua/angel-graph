@@ -9,13 +9,14 @@ import scala.reflect.runtime.universe._
 
 case class GGetResult(value: Any) extends GetResult
 
-class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int, var initId: Int) extends PartitionGetResult {
+class GPartitionGetResult(var tt: TypeTag[_], var pResult: Any, var mergeFuncId: Int) extends PartitionGetResult {
 
-  def this() = this(null.asInstanceOf[Type], null.asInstanceOf[Any], -1, -1)
+  def this() = this(null, null, -1)
 
   override def serialize(byteBuf: ByteBuf): Unit = {
-    SerDe.serPrimitive(tpe.toString, byteBuf)
+    SerDe.javaSerialize(tt, byteBuf)
 
+    val tpe = tt.tpe
     tpe match {
       case t if GUtils.isPrimitive(t) => SerDe.serPrimitive(pResult, byteBuf)
       case t if GUtils.isPrimitiveArray(t) => SerDe.serArr(pResult, byteBuf)
@@ -25,11 +26,11 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
     }
 
     byteBuf.writeInt(mergeFuncId)
-    byteBuf.writeInt(initId)
   }
 
   override def deserialize(byteBuf: ByteBuf): Unit = {
-    tpe = ReflectUtils.typeFromString(SerDe.primitiveFromBuffer[String](byteBuf))
+    val tt = SerDe.javaDeserialize[TypeTag[_]](byteBuf)
+    val tpe = tt.tpe
 
     tpe match {
       case t if GUtils.isPrimitive(t) =>
@@ -46,11 +47,11 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
     }
 
     mergeFuncId = byteBuf.readInt()
-    initId = byteBuf.readInt()
   }
 
   override def bufferLen(): Int = {
-    val tpeLen = SerDe.serPrimitiveBufSize(tpe.toString)
+    val tpeLen = SerDe.javaSerBufferSize(tt)
+    val tpe = tt.tpe
 
     val dataLen = tpe match {
       case t if GUtils.isPrimitive(t) => SerDe.serPrimitiveBufSize(pResult)
@@ -60,6 +61,6 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int,
       case t => SerDe.bufferLen(pResult, ReflectUtils.getFields(t))
     }
 
-    tpeLen + dataLen + 8
+    tpeLen + dataLen + 4
   }
 }
