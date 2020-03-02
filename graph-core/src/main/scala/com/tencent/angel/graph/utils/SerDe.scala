@@ -1302,6 +1302,11 @@ object SerDe {
         }
         fast.deserialize(byteBuf)
         fast
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Int]
+        && (tp.typeArgs.last <:< typeOf[GData] || tp.typeArgs.last <:< typeOf[Serializable]) =>
+        val fast = ReflectUtils.newFastHashMap(tp)
+        fast.deserialize(byteBuf)
+        fast
       case tp if tp =:= typeOf[FastHashMap[Int, Array[Boolean]]] =>
         val fast = new FastHashMap[Int, Array[Boolean]]()
         fast.deserialize(byteBuf)
@@ -1394,6 +1399,11 @@ object SerDe {
           case vt if vt =:= typeOf[LongDoubleVector] =>
             new FastHashMap[Long, LongDoubleVector]()
         }
+        fast.deserialize(byteBuf)
+        fast
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Long]
+        && (tp.typeArgs.last <:< typeOf[GData] || tp.typeArgs.last <:< typeOf[Serializable]) =>
+        val fast = ReflectUtils.newFastHashMap(tp)
         fast.deserialize(byteBuf)
         fast
       case tp if tp =:= typeOf[FastHashMap[Long, Array[Boolean]]] =>
