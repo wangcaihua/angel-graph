@@ -2,6 +2,7 @@ package com.tencent.angel.graph.utils
 
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.GData
+import com.tencent.angel.ml.math2.vector._
 import io.netty.buffer.ByteBuf
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
@@ -605,15 +606,26 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
           iterator.foreach { case (k: Int, v: Float) => byteBuf.writeInt(k).writeFloat(v) }
         case vclz if vclz == classOf[Double] =>
           iterator.foreach { case (k: Int, v: Double) => byteBuf.writeInt(k).writeDouble(v) }
+        case vclz if vclz == classOf[String] =>
+          iterator.foreach { case (k: Int, v: String) =>
+            byteBuf.writeInt(k)
+            val bytes = v.getBytes()
+            byteBuf.writeInt(bytes.length).writeBytes(bytes)
+          }
         case vclz if vclz.isArray =>
-          iterator.foreach { case (k: Int, v) =>
+          iterator.foreach { case (k: Int, v: Array[_]) =>
             byteBuf.writeInt(k)
             SerDe.serArr(v, byteBuf)
           }
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
-          iterator.foreach { case (k: Int, v: V) =>
+          iterator.foreach { case (k: Int, v: GData) =>
             byteBuf.writeInt(k)
-            v.asInstanceOf[GData].serialize(byteBuf)
+            v.serialize(byteBuf)
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          iterator.foreach { case (k: Int, v: Vector) =>
+            byteBuf.writeInt(k)
+            SerDe.serVector(v, byteBuf)
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
           iterator.foreach { case (k: Int, v: Serializable) =>
@@ -641,15 +653,26 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
           iterator.foreach { case (k: Long, v: Float) => byteBuf.writeLong(k).writeFloat(v) }
         case vclz if vclz == classOf[Double] =>
           iterator.foreach { case (k: Long, v: Double) => byteBuf.writeLong(k).writeDouble(v) }
+        case vclz if vclz == classOf[String] =>
+          iterator.foreach { case (k: Long, v: String) =>
+            byteBuf.writeLong(k)
+            val bytes = v.getBytes()
+            byteBuf.writeInt(bytes.length).writeBytes(bytes)
+          }
         case vclz if vclz.isArray =>
-          iterator.foreach { case (k: Long, v) =>
+          iterator.foreach { case (k: Long, v: Array[_]) =>
             byteBuf.writeLong(k)
             SerDe.serArr(v, byteBuf)
           }
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
-          iterator.foreach { case (k: Long, v: V) =>
+          iterator.foreach { case (k: Long, v: GData) =>
             byteBuf.writeLong(k)
-            v.asInstanceOf[GData].serialize(byteBuf)
+            v.serialize(byteBuf)
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          iterator.foreach { case (k: Long, v: Vector) =>
+            byteBuf.writeLong(k)
+            SerDe.serVector(v, byteBuf)
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
           iterator.foreach { case (k: Long, v: Serializable) =>
@@ -679,49 +702,58 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readBoolean()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Char] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readChar()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Byte] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readByte()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Short] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readShort()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Int] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readInt()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Long] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readLong()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Float] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readFloat()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Double] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
             val value = byteBuf.readDouble()
-            put(key.asInstanceOf[K], value.asInstanceOf[V])
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
+          }
+        case vclz if vclz == classOf[String] =>
+          (0 until mapSize).foreach { _ =>
+            val key = byteBuf.readInt()
+            val len = byteBuf.readInt()
+            val bytes = new Array[Byte](len)
+            byteBuf.readBytes(bytes)
+            val value = new String(bytes)
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if vclz == classOf[Array[Boolean]] =>
           (0 until mapSize).foreach { _ =>
@@ -777,6 +809,12 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
             val value = ReflectUtils.newInstance(typeOf[V])
               .asInstanceOf[GData]
             value.deserialize(byteBuf)
+            put(key.asInstanceOf[K], value.asInstanceOf[V])
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          (0 until mapSize).foreach { _ =>
+            val key = byteBuf.readInt()
+            val value = SerDe.vectorFromBuffer(typeOf[V], byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
@@ -837,6 +875,15 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
             val value = byteBuf.readDouble()
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
+        case vclz if vclz == classOf[String] =>
+          (0 until mapSize).foreach { _ =>
+            val key = byteBuf.readLong()
+            val len = byteBuf.readInt()
+            val bytes = new Array[Byte](len)
+            byteBuf.readBytes(bytes)
+            val value = new String(bytes)
+            update(key.asInstanceOf[K], value.asInstanceOf[V])
+          }
         case vclz if vclz == classOf[Array[Boolean]] =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readLong()
@@ -891,6 +938,12 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
             val value = ReflectUtils.newInstance(typeOf[V])
               .asInstanceOf[GData]
             value.deserialize(byteBuf)
+            put(key.asInstanceOf[K], value.asInstanceOf[V])
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          (0 until mapSize).foreach { _ =>
+            val key = byteBuf.readLong()
+            val value = SerDe.vectorFromBuffer(typeOf[V], byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
@@ -924,6 +977,11 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
           len += numElements * 8
         case vclz if vclz == classOf[Double] =>
           len += numElements * 12
+        case vclz if vclz == classOf[String] =>
+          iterator.foreach { case (_, v: String) =>
+            val bytes = v.getBytes()
+            len += 8 + bytes.length
+          }
         case vclz if vclz.isArray =>
           iterator.foreach { case (_, v) =>
             len += 4 + SerDe.serArrBufSize(v)
@@ -931,6 +989,10 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
           iterator.foreach { case (_, v: GData) =>
             len += v.bufferLen() + 4
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          iterator.foreach { case (_: Int, v: Vector) =>
+            len += 4 + SerDe.serVectorBufSize(v)
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
           iterator.foreach { case (_, v: Serializable) =>
@@ -956,6 +1018,11 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
           len += numElements * 12
         case vclz if vclz == classOf[Double] =>
           len += numElements * 16
+        case vclz if vclz == classOf[String] =>
+          iterator.foreach { case (_, v: String) =>
+            val bytes = v.getBytes()
+            len += 12 + bytes.length
+          }
         case vclz if vclz.isArray =>
           iterator.foreach { case (_, v) =>
             len += 8 + SerDe.serArrBufSize(v)
@@ -963,6 +1030,10 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
           iterator.foreach { case (_, v: GData) =>
             len += v.bufferLen() + 8
+          }
+        case vclz if classOf[Vector].isAssignableFrom(vclz) =>
+          iterator.foreach { case (_: Int, v: Vector) =>
+            len += 8 + SerDe.serVectorBufSize(v)
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
           iterator.foreach { case (_, v: Serializable) =>

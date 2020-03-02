@@ -121,11 +121,12 @@ object GUtils {
     val t2 = typeOf[Int2ObjectOpenHashMap[_]].typeSymbol.asClass.toType
     val t3 = typeOf[FastHashMap[Int, _]].typeSymbol.asClass.toType
     if (t1 =:= t2) {
-      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable]
+      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable] ||
+        tpe.typeArgs.head <:< typeOf[Vector]
     } else if (t1 =:= t3) {
       val kt = tpe.typeArgs.head
       val vt = tpe.typeArgs(1)
-      kt =:= typeOf[Int] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable])
+      kt =:= typeOf[Int] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable] || vt <:< typeOf[Vector])
     } else {
       false
     }
@@ -137,11 +138,12 @@ object GUtils {
     val t3 = typeOf[FastHashMap[Long, _]].typeSymbol.asClass.toType
 
     if (t1 =:= t2) {
-      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable]
+      tpe.typeArgs.head <:< typeOf[GData] || tpe.typeArgs.head <:< typeOf[Serializable] ||
+        tpe.typeArgs.head <:< typeOf[Vector]
     } else if (t1 =:= t3) {
       val kt = tpe.typeArgs.head
       val vt = tpe.typeArgs(1)
-      kt =:= typeOf[Long] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable])
+      kt =:= typeOf[Long] && (vt <:< typeOf[GData] || vt <:< typeOf[Serializable] || vt <:< typeOf[Vector])
     } else {
       false
     }

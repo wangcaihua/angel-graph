@@ -17,9 +17,9 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
   extends GetParam(mId) {
 
   private val typeTag = implicitly[TypeTag[T]]
+  private val tpe = typeTag.tpe
 
   override def split(): util.List[PartitionGetParam] = {
-    val tpe = typeOf[T]
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
       .getPartitions(matrixId)
 
@@ -46,7 +46,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 
       splits
     } else if (tpe <:< typeOf[Singular]) {
-      val splits = new util.ArrayList[PartitionGetParam](1)
+      val splits = new util.ArrayList[PartitionGetParam]()
       val idx = params.asInstanceOf[Singular].partition
       val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), typeTag, params,
         getFuncId, mergeFuncId)

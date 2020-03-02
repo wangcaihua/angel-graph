@@ -4,7 +4,6 @@ import java.util
 
 import com.tencent.angel.PartitionKey
 import com.tencent.angel.graph.VertexId
-import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Singular, Splitter}
 import com.tencent.angel.graph.core.psf.utils.ParamSerDe
 import com.tencent.angel.graph.utils.{GUtils, SerDe}
@@ -18,9 +17,9 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
   extends UpdateParam(mId, uClock) {
 
   private val typeTag = implicitly[TypeTag[T]]
+  private val tpe = typeTag.tpe
 
   override def split(): util.List[PartitionUpdateParam] = {
-    val tpe = typeOf[T]
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
       .getPartitions(matrixId)
 

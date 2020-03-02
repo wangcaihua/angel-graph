@@ -3,7 +3,6 @@ package com.tencent.angel.graph.utils
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 import com.tencent.angel.common.Serialize
-import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.storage._
 import com.tencent.angel.ml.math2.vector._
@@ -390,11 +389,15 @@ object SerDe {
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
-              case s: Serialize =>
+              case s: GData =>
                 s.serialize(byteBuf)
+              case s: Vector =>
+                serVector(s, byteBuf)
               case s: String =>
                 val bytes = s.getBytes
                 byteBuf.writeInt(bytes.length).writeBytes(bytes)
+              case s: Serializable =>
+                javaSerialize(s, byteBuf)
               case _ =>
                 throw new Exception("cannot serialize value object!")
             }
@@ -486,11 +489,15 @@ object SerDe {
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
-              case s: Serialize =>
+              case s: GData =>
                 s.serialize(byteBuf)
+              case s: Vector =>
+                serVector(s, byteBuf)
               case s: String =>
                 val bytes = s.getBytes
                 byteBuf.writeInt(bytes.length).writeBytes(bytes)
+              case s: Serializable =>
+                javaSerialize(s, byteBuf)
               case _ =>
                 throw new Exception("cannot serialize value object!")
             }
@@ -553,8 +560,10 @@ object SerDe {
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
-              case s: Serialize =>
+              case s: GData =>
                 len += s.bufferLen()
+              case s: Vector =>
+                len += serVectorBufSize(s)
               case s: String =>
                 len += 4 + s.getBytes.length
               case _ =>
@@ -607,8 +616,10 @@ object SerDe {
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
-              case s: Serialize =>
+              case s: GData =>
                 len += s.bufferLen()
+              case s: Vector =>
+                len += serVectorBufSize(s)
               case s: String =>
                 len += 4 + s.getBytes.length
               case _ =>
@@ -690,9 +701,25 @@ object SerDe {
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
                   (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Int]
-                    val value = temp(key).asInstanceOf[GData]
                     byteBuf.writeInt(key)
+                    val value = temp(key).asInstanceOf[GData]
                     value.serialize(byteBuf)
+                  }
+                case vt if classOf[Vector].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key)
+                    val value = temp(key).asInstanceOf[Vector]
+                    serVector(value, byteBuf)
+                  }
+                case vt if vt == classOf[String] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, String]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    byteBuf.writeInt(key)
+                    val bytes = temp(key).getBytes()
+                    byteBuf.writeInt(bytes.length).writeBytes(bytes)
                   }
                 case vt if classOf[Serializable].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
@@ -773,8 +800,10 @@ object SerDe {
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
-                  case v: Serialize =>
-                    v.serialize(byteBuf)
+                  case s: GData =>
+                    s.serialize(byteBuf)
+                  case v: Vector =>
+                    serVector(v, byteBuf)
                   case str: String =>
                     val bytes = str.getBytes
                     byteBuf.writeInt(bytes.length).writeBytes(str.getBytes)
@@ -836,6 +865,22 @@ object SerDe {
                   (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Long]
                     byteBuf.writeLong(key).writeDouble(temp(key))
+                  }
+                case vt if classOf[Vector].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key)
+                    val value = temp(key).asInstanceOf[Vector]
+                    serVector(value, byteBuf)
+                  }
+                case vt if vt == classOf[String] =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, String]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    byteBuf.writeLong(key)
+                    val bytes = temp(key).getBytes()
+                    byteBuf.writeInt(bytes.length).writeBytes(bytes)
                   }
                 case vt if vt.isArray =>
                   val temp = fast.asInstanceOf[FastHashMap[Long, _]]
@@ -929,8 +974,10 @@ object SerDe {
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
-                  case v: Serialize =>
-                    v.serialize(byteBuf)
+                  case s: GData =>
+                    s.serialize(byteBuf)
+                  case v: Vector =>
+                    serVector(v, byteBuf)
                   case str: String =>
                     val bytes = str.getBytes
                     byteBuf.writeInt(bytes.length).writeBytes(str.getBytes)
@@ -973,6 +1020,13 @@ object SerDe {
                   len += 8 * (end - start)
                 case vt if vt == classOf[Double] =>
                   len += 12 * (end - start)
+                case vt if vt == classOf[String] =>
+                  val temp = map.asInstanceOf[FastHashMap[Int, String]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    val bytes = temp(key).getBytes()
+                    len += 8 + bytes.length
+                  }
                 case vclz if vclz.isArray =>
                   val temp = map.asInstanceOf[FastHashMap[Int, _]]
                   (start until end).foreach { idx =>
@@ -984,6 +1038,13 @@ object SerDe {
                   (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Int]
                     len += 4 + temp(key).asInstanceOf[GData].bufferLen()
+                  }
+                case vt if classOf[Vector].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Int, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Int]
+                    val value = temp(key).asInstanceOf[Vector]
+                    len += 4 + serVectorBufSize(value)
                   }
                 case vt if classOf[Serializable].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Int, _]]
@@ -1037,8 +1098,10 @@ object SerDe {
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
-                  case v: Serialize =>
-                    len += v.bufferLen()
+                  case s: GData =>
+                    len += s.bufferLen()
+                  case v: Vector =>
+                    len += serVectorBufSize(v)
                   case str: String =>
                     len += 4 + str.getBytes.length
                   case _ =>
@@ -1068,6 +1131,13 @@ object SerDe {
                   len += 12 * (end - start)
                 case vt if vt == classOf[Double] =>
                   len += 18 * (end - start)
+                case vt if vt == classOf[String] =>
+                  val temp = map.asInstanceOf[FastHashMap[Long, String]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    val bytes = temp(key).getBytes()
+                    len += 12 + bytes.length
+                  }
                 case vclz if vclz.isArray =>
                   val temp = map.asInstanceOf[FastHashMap[Long, _]]
                   (start until end).foreach { idx =>
@@ -1079,6 +1149,13 @@ object SerDe {
                   (start until end).foreach { idx =>
                     val key = keys(idx).asInstanceOf[Long]
                     len += 8 + temp(key).asInstanceOf[GData].bufferLen()
+                  }
+                case vt if classOf[Vector].isAssignableFrom(vt) =>
+                  val temp = fast.asInstanceOf[FastHashMap[Long, _]]
+                  (start until end).foreach { idx =>
+                    val key = keys(idx).asInstanceOf[Long]
+                    val value = temp(key).asInstanceOf[Vector]
+                    len += 8 + serVectorBufSize(value)
                   }
                 case vt if classOf[Serializable].isAssignableFrom(vt) =>
                   val temp = fast.asInstanceOf[FastHashMap[Long, _]]
@@ -1132,8 +1209,10 @@ object SerDe {
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
-                  case v: Serialize =>
-                    len + v.bufferLen()
+                  case s: GData =>
+                    len += s.bufferLen()
+                  case v: Vector =>
+                    len += serVectorBufSize(v)
                   case str: String =>
                     len += 4 + str.getBytes.length
                   case _ =>
@@ -1191,6 +1270,36 @@ object SerDe {
         fast
       case tp if tp =:= typeOf[FastHashMap[Int, Double]] =>
         val fast = new FastHashMap[Int, Double]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Int, String]] =>
+        val fast = new FastHashMap[Int, String]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Int]
+        && tp.typeArgs.last <:< typeOf[Vector] =>
+        val fast = tp.typeArgs.last match {
+          case vt if vt =:= typeOf[IntDummyVector] =>
+            new FastHashMap[Int, IntDummyVector]()
+          case vt if vt =:= typeOf[IntIntVector] =>
+            new FastHashMap[Int, IntIntVector]()
+          case vt if vt =:= typeOf[IntLongVector] =>
+            new FastHashMap[Int, IntLongVector]()
+          case vt if vt =:= typeOf[IntFloatVector] =>
+            new FastHashMap[Int, IntFloatVector]()
+          case vt if vt =:= typeOf[IntDoubleVector] =>
+            new FastHashMap[Int, IntDoubleVector]()
+          case vt if vt =:= typeOf[LongDummyVector] =>
+            new FastHashMap[Int, LongDummyVector]()
+          case vt if vt =:= typeOf[LongIntVector] =>
+            new FastHashMap[Int, LongIntVector]()
+          case vt if vt =:= typeOf[LongLongVector] =>
+            new FastHashMap[Int, LongLongVector]()
+          case vt if vt =:= typeOf[LongFloatVector] =>
+            new FastHashMap[Int, LongFloatVector]()
+          case vt if vt =:= typeOf[LongDoubleVector] =>
+            new FastHashMap[Int, LongDoubleVector]()
+        }
         fast.deserialize(byteBuf)
         fast
       case tp if tp =:= typeOf[FastHashMap[Int, Array[Boolean]]] =>
@@ -1255,6 +1364,36 @@ object SerDe {
         fast
       case tp if tp =:= typeOf[FastHashMap[Long, Double]] =>
         val fast = new FastHashMap[Long, Double]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if tp =:= typeOf[FastHashMap[Long, String]] =>
+        val fast = new FastHashMap[Long, String]()
+        fast.deserialize(byteBuf)
+        fast
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Long]
+        && tp.typeArgs.last <:< typeOf[Vector] =>
+        val fast = tp.typeArgs.last match {
+          case vt if vt =:= typeOf[IntDummyVector] =>
+            new FastHashMap[Long, IntDummyVector]()
+          case vt if vt =:= typeOf[IntIntVector] =>
+            new FastHashMap[Long, IntIntVector]()
+          case vt if vt =:= typeOf[IntLongVector] =>
+            new FastHashMap[Long, IntLongVector]()
+          case vt if vt =:= typeOf[IntFloatVector] =>
+            new FastHashMap[Long, IntFloatVector]()
+          case vt if vt =:= typeOf[IntDoubleVector] =>
+            new FastHashMap[Long, IntDoubleVector]()
+          case vt if vt =:= typeOf[LongDummyVector] =>
+            new FastHashMap[Long, LongDummyVector]()
+          case vt if vt =:= typeOf[LongIntVector] =>
+            new FastHashMap[Long, LongIntVector]()
+          case vt if vt =:= typeOf[LongLongVector] =>
+            new FastHashMap[Long, LongLongVector]()
+          case vt if vt =:= typeOf[LongFloatVector] =>
+            new FastHashMap[Long, LongFloatVector]()
+          case vt if vt =:= typeOf[LongDoubleVector] =>
+            new FastHashMap[Long, LongDoubleVector]()
+        }
         fast.deserialize(byteBuf)
         fast
       case tp if tp =:= typeOf[FastHashMap[Long, Array[Boolean]]] =>
@@ -1371,17 +1510,119 @@ object SerDe {
         }
         res
       case tp if GUtils.isSerIntKeyMap(tp) =>
-        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+        tp.typeArgs.head match {
+          case vt if vt =:= typeOf[IntDummyVector] =>
+            val outer = new Int2ObjectOpenHashMap[IntDummyVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[IntDummyVector](byteBuf)
+              outer.put(key, inner)
+            }
 
-        val put = ReflectUtils.method(outer, "put", typeOf[Int])
-        (0 until size).foreach { _ =>
-          val key = byteBuf.readInt()
-          val inner = ReflectUtils.newInstance(tp.typeArgs.head).asInstanceOf[Serialize]
-          inner.deserialize(byteBuf)
-          put(key, inner)
+            outer
+          case vt if vt =:= typeOf[IntIntVector] =>
+            val outer = new Int2ObjectOpenHashMap[IntIntVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[IntIntVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntLongVector] =>
+            val outer = new Int2ObjectOpenHashMap[IntLongVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[IntLongVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntFloatVector] =>
+            val outer = new Int2ObjectOpenHashMap[IntFloatVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[IntFloatVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntDoubleVector] =>
+            val outer = new Int2ObjectOpenHashMap[IntDoubleVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[IntDoubleVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongDummyVector] =>
+            val outer = new Int2ObjectOpenHashMap[LongDummyVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[LongDummyVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongIntVector] =>
+            val outer = new Int2ObjectOpenHashMap[LongIntVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[LongIntVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongLongVector] =>
+            val outer = new Int2ObjectOpenHashMap[LongLongVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[LongLongVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongFloatVector] =>
+            val outer = new Int2ObjectOpenHashMap[LongFloatVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[LongFloatVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongDoubleVector] =>
+            val outer = new Int2ObjectOpenHashMap[LongDoubleVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = vectorFromBuffer[LongDoubleVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt <:< typeOf[GData] =>
+            val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+            val put = ReflectUtils.method(outer, "put", typeOf[Int])
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              val inner = ReflectUtils.newInstance(vt).asInstanceOf[GData]
+              inner.deserialize(byteBuf)
+              put(key, inner)
+            }
+
+            outer
+          case vt if vt <:< typeOf[Serializable] =>
+            val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+            val put = ReflectUtils.method(outer, "put", typeOf[Int])
+
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readInt()
+              put(key, javaDeserialize[Any](byteBuf))
+            }
+
+            outer
         }
-
-        outer
       case tp if tp =:= typeOf[Int2ObjectOpenHashMap[Array[Boolean]]] =>
         val res = new Int2ObjectOpenHashMap[Array[Boolean]](size)
 
@@ -1513,17 +1754,119 @@ object SerDe {
         }
         res
       case tp if GUtils.isSerLongKeyMap(tp) =>
-        val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+        tp.typeArgs.head match {
+          case vt if vt =:= typeOf[IntDummyVector] =>
+            val outer = new Long2ObjectOpenHashMap[IntDummyVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[IntDummyVector](byteBuf)
+              outer.put(key, inner)
+            }
 
-        val put = ReflectUtils.method(outer, "put", typeOf[Long])
-        (0 until size).foreach { _ =>
-          val key = byteBuf.readLong()
-          val inner = ReflectUtils.newInstance(tp.typeArgs.head).asInstanceOf[Serialize]
-          inner.deserialize(byteBuf)
-          put(key, inner)
+            outer
+          case vt if vt =:= typeOf[IntIntVector] =>
+            val outer = new Long2ObjectOpenHashMap[IntIntVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[IntIntVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntLongVector] =>
+            val outer = new Long2ObjectOpenHashMap[IntLongVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[IntLongVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntFloatVector] =>
+            val outer = new Long2ObjectOpenHashMap[IntFloatVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[IntFloatVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[IntDoubleVector] =>
+            val outer = new Long2ObjectOpenHashMap[IntDoubleVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[IntDoubleVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongDummyVector] =>
+            val outer = new Long2ObjectOpenHashMap[LongDummyVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[LongDummyVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongIntVector] =>
+            val outer = new Long2ObjectOpenHashMap[LongIntVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[LongIntVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongLongVector] =>
+            val outer = new Long2ObjectOpenHashMap[LongLongVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[LongLongVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongFloatVector] =>
+            val outer = new Long2ObjectOpenHashMap[LongFloatVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[LongFloatVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt =:= typeOf[LongDoubleVector] =>
+            val outer = new Long2ObjectOpenHashMap[LongDoubleVector](size)
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = vectorFromBuffer[LongDoubleVector](byteBuf)
+              outer.put(key, inner)
+            }
+
+            outer
+          case vt if vt <:< typeOf[GData] =>
+            val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+            val put = ReflectUtils.method(outer, "put", typeOf[Long])
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              val inner = ReflectUtils.newInstance(vt).asInstanceOf[GData]
+              inner.deserialize(byteBuf)
+              put(key, inner)
+            }
+
+            outer
+          case vt if vt <:< typeOf[Serializable] =>
+            val outer = ReflectUtils.constructor(tp, typeOf[Int])(size)
+            val put = ReflectUtils.method(outer, "put", typeOf[Long])
+
+            (0 until size).foreach { _ =>
+              val key = byteBuf.readLong()
+              put(key, javaDeserialize[Any](byteBuf))
+            }
+
+            outer
         }
-
-        outer
       case tp if tp =:= typeOf[Long2ObjectOpenHashMap[Array[Boolean]]] =>
         val res = new Long2ObjectOpenHashMap[Array[Boolean]](size)
 
@@ -1699,6 +2042,7 @@ object SerDe {
 
   def vectorFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
     assert(tpe <:< typeOf[Vector])
+
     val dim = byteBuf.readLong()
 
     byteBuf.readInt() match {
