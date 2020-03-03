@@ -6,6 +6,7 @@ import com.tencent.angel.ml.math2.vector.Vector
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 
@@ -163,6 +164,23 @@ object GUtils {
       case t if GUtils.isPrimitiveArray(t) => true
       case t if GUtils.isFastMap(t) => true
       case t => t <:< typeOf[GData] && t.typeSymbol.asClass.isCaseClass
+    }
+  }
+
+  def mergeArray[V: ClassTag](arr1: Array[V], arr2: Array[V]): Array[V] = {
+    if ((arr1 == null || arr1.isEmpty) && (arr2 == null || arr2.isEmpty)) {
+      Array.empty[V]
+    } else if (arr1 == null || arr1.isEmpty) {
+      arr2
+    } else if (arr2 == null || arr2.isEmpty) {
+      arr1
+    } else {
+      val res = new Array[V](arr1.length + arr2.length)
+
+      Array.copy(arr1, 0, res, 0, arr1.length)
+      Array.copy(arr2, 0, res, arr1.length, arr2.length)
+
+      res
     }
   }
 }

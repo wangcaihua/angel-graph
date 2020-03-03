@@ -7,8 +7,8 @@ class GraphTest extends WithSONA{
 
   test("loadData") {
     val path = "E:\\github\\fitzwang\\angel-graph\\data\\cora\\cora.cites"
-    val graph = Graph.edgeListFile[Int](sc, path)
-    graph.adjacency[NeighNW](direction=EdgeDirection.Both)
+    val graph = Graph.edgeListFile[Float, Long](sc, path)
+    graph.calDegree("degree", direction=EdgeDirection.Both)
 
     println(graph.psVertices.name)
   }

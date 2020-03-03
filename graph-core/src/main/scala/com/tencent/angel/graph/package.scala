@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.tencent.angel.graph.utils.FastHashSet
 
+import scala.reflect.ClassTag
 import scala.util.Random
 
 package object graph {
@@ -17,6 +18,21 @@ package object graph {
   type VertexSet = FastHashSet[VertexId]
 
   val defaultWeight: WgtTpe = 0.0f
+
+  def getDefaultEdgeAttr[ED: ClassTag]: ED = {
+    val any = implicitly[ClassTag[ED]].runtimeClass match {
+      case ed if ed == classOf[Long] => 0L
+      case ed if ed == classOf[Float] => 0.0f
+      case ed if ed == classOf[Int] => 0
+      case ed if ed == classOf[Double] => 0.0
+      case ed if ed == classOf[Boolean] => false
+      case ed if ed == classOf[Char] => Char.MinValue
+      case ed if ed == classOf[Byte] => 0.toByte
+      case ed if ed == classOf[Short] => 0.toShort
+    }
+
+    any.asInstanceOf[ED]
+  }
 
   def randWeight: WgtTpe = rand.nextFloat()
 
@@ -32,12 +48,30 @@ package object graph {
     def toVertexType: VertexType = wgt.toShort
   }
 
-  implicit class EdgeAttribute(attr: Long) {
+  implicit class ToEdgeAttr(attr: String) {
+    def toEdgeAttr[ED: ClassTag]: ED = {
+      val any = implicitly[ClassTag[ED]].runtimeClass match {
+        case ed if ed == classOf[Long] => attr.toLong
+        case ed if ed == classOf[Float] => attr.toFloat
+        case ed if ed == classOf[Int] => attr.toInt
+        case ed if ed == classOf[Double] => attr.toDouble
+        case ed if ed == classOf[Boolean] => attr.toBoolean
+        case ed if ed == classOf[Char] => attr.toCharArray.head
+        case ed if ed == classOf[Byte] => attr.toByte
+        case ed if ed == classOf[Short] => attr.toShort
+      }
+
+      any.asInstanceOf[ED]
+    }
+  }
+
+  // srcType, dstType, weight
+  implicit class TypedEdgeAttribute(attr: Long) {
     private val buf = ByteBuffer.allocate(8)
     buf.putLong(attr)
     buf.flip()
 
-    var srcType: VertexType = buf.getShort()
+    var srcType: VertexType =  buf.getShort()
 
     var dstType: VertexType = buf.getShort()
 
@@ -46,6 +80,25 @@ package object graph {
     def toAttr: Long = {
       buf.flip()
       buf.putShort(srcType).putShort(dstType).putFloat(weight)
+      buf.flip()
+      buf.getLong()
+    }
+
+  }
+
+  // srcWeight, dstWeight
+  implicit class DoubleWeightEdgeAttribute(attr: Long) {
+    private val buf = ByteBuffer.allocate(8)
+    buf.putLong(attr)
+    buf.flip()
+
+    var srcWeight: WgtTpe = buf.getFloat()
+
+    var dstWeight: WgtTpe = buf.getFloat()
+
+    def toAttr: Long = {
+      buf.flip()
+      buf.putFloat(srcWeight).putFloat(dstWeight)
       buf.flip()
       buf.getLong()
     }

@@ -1,8 +1,7 @@
 package com.tencent.angel.graph.utils
 
 import com.tencent.angel.graph.VertexId
-import it.unimi.dsi.fastutil.ints._
-import it.unimi.dsi.fastutil.longs._
+import io.netty.buffer.ByteBuf
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
@@ -199,120 +198,50 @@ class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int]
     new RefHashMap[U](global2local, local2global, newValues, newBitSet)
   }
 
-  override def asIdMaps: (FastHashMap[VertexId, Int], Array[VertexId]) = {
-    global2local -> local2global
+  override def keyArray: Array[VertexId] = {
+    val temp = new Array[VertexId](size())
+    val iter = bitSet.iterator
+    var idx = 0
+
+    while(iter.hasNext) {
+      temp(idx) = local2global(iter.next())
+      idx += 1
+    }
+
+    temp
   }
 
-  override def toUnimi[T]: T = {
-    (keyTag, valueTag) match {
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Boolean] =>
-        val temp = new Int2BooleanOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Boolean])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Char] =>
-        val temp = new Int2CharOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Char])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Byte] =>
-        val temp = new Int2ByteOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Byte])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Short] =>
-        val temp = new Int2ShortOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Short])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Int] =>
-        val temp = new Int2IntOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Int])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Long] =>
-        val temp = new Int2LongOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Long])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Float] =>
-        val temp = new Int2FloatOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Float])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Double] =>
-        val temp = new Int2DoubleOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos).asInstanceOf[Double])
-        }
-        temp.asInstanceOf[T]
-      case (kt, _) if kt == classOf[Int] =>
-        val temp = new Int2ObjectOpenHashMap[V]()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Int], values(pos))
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Boolean] =>
-        val temp = new Long2BooleanOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Boolean])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Char] =>
-        val temp = new Long2CharOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Char])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Byte] =>
-        val temp = new Long2ByteOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Byte])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Short] =>
-        val temp = new Long2ShortOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Short])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Int] =>
-        val temp = new Long2IntOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Int])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Long] =>
-        val temp = new Long2LongOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Long])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Float] =>
-        val temp = new Long2FloatOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Float])
-        }
-        temp.asInstanceOf[T]
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Double] =>
-        val temp = new Long2DoubleOpenHashMap()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos).asInstanceOf[Double])
-        }
-        temp.asInstanceOf[T]
-      case (kt, _) if kt == classOf[Long] =>
-        val temp = new Long2ObjectOpenHashMap[V]()
-        bitSet.iterator.foreach { pos =>
-          temp.put(local2global(pos).asInstanceOf[Long], values(pos))
-        }
-        temp.asInstanceOf[T]
+  override def valueArray: Array[V] = {
+    val temp = new Array[V](size())
+    val iter = bitSet.iterator
+    var idx = 0
+
+    while(iter.hasNext) {
+      temp(idx) = values(iter.next())
+      idx += 1
     }
+
+    temp
   }
+
+  override def merge(other: FastHashMap[VertexId, V]): this.type = {
+    other.foreach{ case (k, v) => update(k, v) }
+    this
+  }
+
+  override def merge(other: FastHashMap[VertexId, V], mergeF: (V, V) => V): this.type = {
+    other.foreach{ case (k, v) =>
+      if (containsKey(k)) {
+        update(k, mergeF(apply(k), v))
+      } else {
+        update(k, v)
+      }
+    }
+
+    this
+  }
+
+  override def deserialize(byteBuf: ByteBuf): Unit = ???
+
+  def asFastHashMap: FastHashMap[VertexId, V] = this
 }

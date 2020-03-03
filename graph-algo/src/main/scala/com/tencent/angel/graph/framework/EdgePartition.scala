@@ -7,7 +7,7 @@ import com.tencent.angel.graph.core.psf.get.GetPSF
 import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
 import com.tencent.angel.graph.utils.psfConverters._
-import com.tencent.angel.graph.utils.{BitSet, FastArray, FastHashMap, Logging}
+import com.tencent.angel.graph.utils.{BitSet, FastArray, FastHashMap, Logging, RefHashMap}
 import com.tencent.angel.graph.{VertexId, VertexSet}
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.models.PSMatrix
@@ -41,7 +41,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
     val param = ctx.getArrayParam
     val partition = ctx.getPartition[VD]
 
-    param.filter(vid => partition.isMask(vid))
+    param.filter(vid => partition.isActive(global2local(vid)))
   } { ctx: PSFMCtx =>
     val last = ctx.getLast[Array[VertexId]]
     val curr = ctx.getCurr[Array[VertexId]]
@@ -148,6 +148,11 @@ class EdgePartition[VD: ClassTag : TypeTag,
   }
 
   def attrs(pos: Int): ED = data(pos)
+
+  def updateEdgeAttrsByPos(pos: Int, attr: ED) : this.type = {
+    data(pos) = attr
+    this
+  }
 
   def isActive(vid: VertexId): Boolean = activeSet match {
     case Some(as) => as.contains(vid)
@@ -428,7 +433,9 @@ class EdgePartition[VD: ClassTag : TypeTag,
 
     if (batchSize > 0) {
       indexCount = 0
-      bitSet.iterator.foreach { localId => if (!localMask.get(localId)) batchMask.set(localId) }
+      bitSet.iterator.foreach { localId =>
+        if (!localMask.get(localId)) batchMask.set(localId)
+      }
       var batchMsg = new FastHashMap[VertexId, M](batchSize)
       batchMask.iterator.foreach {
         case id if aggregates(id) != null =>
@@ -456,7 +463,10 @@ class EdgePartition[VD: ClassTag : TypeTag,
   }
 }
 
-private class AggregatingEdgeContext[VD, ED, M](mergeMsg: (M, M) => M, aggregates: Array[M], bitSet: BitSet)
+private class AggregatingEdgeContext[VD, ED, M](mergeMsg: (M, M) => M,
+                                                aggregates: Array[M],
+                                                bitSet: BitSet
+                                               )
   extends EdgeContext[VD, ED, M] {
   private[this] var _localSrcId: Int = _
   private[this] var _localDstId: Int = _

@@ -4,13 +4,14 @@ package com.tencent.angel.graph.framework
 import java.util.UUID
 
 import com.tencent.angel.graph._
+import com.tencent.angel.graph.core.data.PSPartition
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx, Singular}
 import com.tencent.angel.graph.core.psf.get.GetPSF
 import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
 import com.tencent.angel.graph.utils.psfConverters._
-import com.tencent.angel.graph.utils.{FastHashMap, Logging, PSFUtils}
+import com.tencent.angel.graph.utils.{BitSet, FastHashMap, Logging, PSFUtils}
 import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.spark.models.PSMatrix
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
@@ -98,11 +99,11 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
 
   private var updateVertexPSF: UpdatePSF = _
 
-  def initVertex[M: TypeTag](vprog: (VD, M) => VD, defaultMsg: M): this.type = {
+  def initVertex[M: TypeTag](vprog: (VD, M) => VD, active:(VD, M) => Boolean, defaultMsg: M): this.type = {
     if (updateVertexPSF == null) {
       updateVertexPSF = psVertices.createUpdate { ctx: PSFGUCtx =>
         val part = ctx.getPartition[VD]
-        part.updateAttrs(vprog, defaultMsg)
+        part.updateAttrs(vprog, active, defaultMsg)
       }
     }
 
@@ -111,8 +112,48 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     this
   }
 
-  def updateVertex[M: TypeTag](vprog: (VD, M) => VD): this.type = {
-    initVertex(vprog, null.asInstanceOf[M])
+  def updateVertex[M: TypeTag](vprog: (VD, M) => VD, active:(VD, M) => Boolean): this.type = {
+    initVertex(vprog, active, null.asInstanceOf[M])
+  }
+
+  def calDegree(slotName: String, direction: EdgeDirection = EdgeDirection.Both): Unit = {
+    edges.foreachPartition { iter =>
+      val edgePartition = iter.next()
+
+      val localDegree = new FastHashMap[VertexId, Int]()
+      direction match {
+        case EdgeDirection.Out =>
+          edgePartition.iterator.foreach { edge =>
+            localDegree.putMerge(edge.srcId, 1, (v1, v2) => v1 + v2)
+          }
+        case EdgeDirection.In =>
+          edgePartition.iterator.foreach { edge =>
+            localDegree.putMerge(edge.dstId, 1, (v1, v2) => v1 + v2)
+          }
+        case EdgeDirection.Both =>
+          edgePartition.iterator.foreach { edge =>
+            localDegree.putMerge(edge.srcId, 1, (v1, v2) => v1 + v2)
+            localDegree.putMerge(edge.dstId, 1, (v1, v2) => v1 + v2)
+          }
+        case _ =>
+          throw new Exception("direction error")
+      }
+
+      val pushDegree = psVertices.createUpdate { ctx: PSFGUCtx =>
+        val params = ctx.getMapParam[Int]
+        val partition = ctx.getPartition[VD]
+        val degree = partition.getOrCreateSlot[Int](slotName)
+
+        def mergeF(v1: Int, v2: Int): Int = v1 + v2
+
+        params.foreach { case (k, v) =>
+          degree.putMerge(k, v, mergeF)
+        }
+      }
+
+      pushDegree(localDegree)
+      pushDegree.clear()
+    }
   }
 
   private var activeMessageCountPSF: GetPSF[Int] = _
@@ -169,15 +210,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
       }
 
       // 3. push adjacency (on executor)
-      if (classOf[VertexId] == classOf[Long]) {
-        pushAdjacency[Long2ObjectOpenHashMap[N]](
-          adjBuilder.build[Long2ObjectOpenHashMap[N]]
-        )
-      } else {
-        pushAdjacency[Int2ObjectOpenHashMap[N]](
-          adjBuilder.build[Int2ObjectOpenHashMap[N]]
-        )
-      }
+      pushAdjacency(adjBuilder.build)
 
       // 4. remove PSF (on executor)
       pushAdjacency.clear()
@@ -241,7 +274,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
 
       // 2. create PSF to push Adjacency (from executor)
       val pushAdjacency = psVertices.createUpdate { ctx: PSFGUCtx =>
-        val psPartition = ctx.getPartition[Int]
+        val psPartition = ctx.getPartition[VD]
         val psAdjBuilder = psPartition.getOrCreateSlot[TypedNeighborBuilder]("adjacencyBuilder")
         ctx.getMapParam[N].foreach { case (vid, neigh) =>
           if (psAdjBuilder.containsKey(vid)) {
@@ -255,15 +288,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
       }
 
       // 3. push adjacency (on executor)
-      if (classOf[VertexId] == classOf[Long]) {
-        pushAdjacency[Long2ObjectOpenHashMap[N]](
-          adjBuilder.build[Long2ObjectOpenHashMap[N]]
-        )
-      } else {
-        pushAdjacency[Int2ObjectOpenHashMap[N]](
-          adjBuilder.build[Int2ObjectOpenHashMap[N]]
-        )
-      }
+      pushAdjacency(adjBuilder.build)
 
       // 4. remove PSF (on executor)
       pushAdjacency.clear()
@@ -314,12 +339,12 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
 }
 
 object Graph {
-  def edgeListFile[VD: ClassTag : TypeTag](sc: SparkContext, path: String,
-                                           numEdgePartition: Int = -1,
-                                           edgeDirection: EdgeDirection = EdgeDirection.Both,
-                                           canonicalOrientation: Boolean = false,
-                                           storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
-                                          ): Graph[VD, WgtTpe] = {
+  def edgeListFile[VD: ClassTag : TypeTag, ED: ClassTag](sc: SparkContext, path: String,
+                                                         numEdgePartition: Int = -1,
+                                                         edgeDirection: EdgeDirection = EdgeDirection.Both,
+                                                         canonicalOrientation: Boolean = false,
+                                                         storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
+                                                        ): Graph[VD, ED] = {
     val lines = if (numEdgePartition > 0) {
       sc.textFile(path, numEdgePartition).coalesce(numEdgePartition)
     } else {
@@ -327,7 +352,9 @@ object Graph {
     }
 
     val edges = lines.mapPartitions { iter =>
-      val builder = new EdgePartitionBuilder[VD, WgtTpe](edgeDirection = edgeDirection)
+      val builder = new EdgePartitionBuilder[VD, ED](edgeDirection = edgeDirection)
+      val defaultEdgeAttr = getDefaultEdgeAttr[ED]
+
       iter.foreach { line =>
         if (!line.isEmpty && line(0) != '#') {
           val lineArray = line.split("\\s+")
@@ -340,17 +367,17 @@ object Graph {
             val dstId = lineArray(1).toVertexId
             if (canonicalOrientation) {
               if (srcId > dstId) {
-                builder.add(Edge(dstId, srcId, randWeight))
+                builder.add(Edge(dstId, srcId, defaultEdgeAttr))
               }
             } else if (srcId != dstId) {
-              builder.add(Edge(srcId, dstId, randWeight))
+              builder.add(Edge(srcId, dstId, defaultEdgeAttr))
             } else {
               println(s"$srcId = $dstId, error! ")
             }
           } else if (lineArray.length == 3) {
             val srcId = lineArray(0).toVertexId
             val dstId = lineArray(1).toVertexId
-            val weight = lineArray(3).toWgtTpe
+            val weight = lineArray(3).toEdgeAttr[ED]
             if (canonicalOrientation) {
               if (srcId > dstId) {
                 builder.add(Edge(dstId, srcId, weight))
@@ -375,16 +402,17 @@ object Graph {
   }
 
 
-  def fromEdgeRDD[VD: ClassTag : TypeTag](rdd: RDD[(VertexId, VertexId)],
+  def fromEdgeRDD[VD: ClassTag : TypeTag, ED: ClassTag](rdd: RDD[(VertexId, VertexId)],
                                           edgeDirection: EdgeDirection = EdgeDirection.Out,
                                           canonicalOrientation: Boolean = false,
-                                          storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, WgtTpe] = {
+                                          storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY): Graph[VD, ED] = {
 
     val edges = rdd.mapPartitions { iter =>
-      val builder = new EdgePartitionBuilder[VD, WgtTpe](edgeDirection = edgeDirection)
+      val builder = new EdgePartitionBuilder[VD, ED](edgeDirection = edgeDirection)
+      val defaultEdgeAttr = getDefaultEdgeAttr[ED]
 
       iter.foreach { case (srcId, dstId) =>
-        builder.add(Edge[WgtTpe](srcId, dstId, defaultWeight))
+        builder.add(Edge(srcId, dstId, defaultEdgeAttr))
       }
 
       Iterator.single(builder.build)

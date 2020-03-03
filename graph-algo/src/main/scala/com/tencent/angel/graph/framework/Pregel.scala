@@ -15,7 +15,8 @@ object Pregel extends Logging {
    activeDirection: EdgeDirection = EdgeDirection.Either)
   (vprog: (VD, M) => VD,
    sendMsg: EdgeTriplet[VD, ED] => Iterator[(VertexId, M)],
-   mergeMsg: (M, M) => M): Graph[VD, ED] = {
+   mergeMsg: (M, M) => M,
+   active: (VD, M) => Boolean = (vd: VD, m: M) => true): Graph[VD, ED] = {
 
     require(maxIterations > 0, s"Maximum number of iterations must be greater than 0, but got $maxIterations")
 
@@ -27,11 +28,11 @@ object Pregel extends Logging {
       case _ => EdgeActiveness.Neither
     }
 
-    graph.initVertex(vprog, initialMsg)
+    graph.initVertex(vprog, active, initialMsg)
 
     // compute the messages
     mapReduceTriplets(graph, sendMsg, mergeMsg, batchSize, activeness)
-    graph.updateVertex(vprog)
+    graph.updateVertex(vprog, active)
     var activeMessages = graph.activeMessageCount()
 
     // Loop
@@ -39,7 +40,7 @@ object Pregel extends Logging {
     while (activeMessages > 0 && i < maxIterations) {
       // Receive the messages and update the vertices.
       mapReduceTriplets(graph, sendMsg, mergeMsg, batchSize, activeness)
-      graph.updateVertex(vprog)
+      graph.updateVertex(vprog, active)
       activeMessages = graph.activeMessageCount()
 
       i += 1

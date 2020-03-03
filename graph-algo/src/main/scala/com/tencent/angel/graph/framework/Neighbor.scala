@@ -227,8 +227,8 @@ class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
     this
   }
 
-  def build[T]: T = {
-    neighTable.mapValues[N](value => value.build[N]).toUnimi[T]
+  def build: FastHashMap[VertexId, N] = {
+    neighTable.mapValues[N](value => value.build[N])
   }
 }
 
@@ -561,7 +561,7 @@ class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
     this
   }
 
-  def build[T]: T = {
-    neighTable.mapValues[N](value => value.build[N]).toUnimi[T]
+  def build: FastHashMap[VertexId, N] = {
+    neighTable.mapValues[N](value => value.build[N])
   }
 }

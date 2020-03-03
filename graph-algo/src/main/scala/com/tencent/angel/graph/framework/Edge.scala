@@ -163,7 +163,6 @@ abstract class EdgeContext[VD, ED, A] {
 
   def attr: ED = _attr
 
-
   def sendToSrc(msg: A): Unit
 
   def sendToDst(msg: A): Unit

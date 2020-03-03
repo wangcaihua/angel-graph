@@ -13,6 +13,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
                                 val local2global: Array[VertexId]) extends Logging {
   private lazy val attrs: Array[VD] = new Array[VD](global2local.size())
   private lazy val mask: BitSet = {
+    // active all in initial
     val bs = new BitSet(global2local.size())
     local2global.indices.foreach(idx => bs.set(idx))
     bs
@@ -45,33 +46,37 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     this
   }
 
-  def updateAttrs[M](vprog: (VD, M) => VD, defaultMsg: M): this.type ={
-    attrs.indices.foreach{ pos =>
+  def updateAttrs[M](vprog: (VD, M) => VD, active: (VD, M) => Boolean, defaultMsg: M): this.type = {
+    attrs.indices.foreach { pos =>
       val msg = message(pos).asInstanceOf[M]
+      val attr = attrs(pos)
 
       if (msg != null) {
-        attrs(pos) = vprog(attrs(pos), msg)
+        if (active(attr, msg)) {
+          attrs(pos) = vprog(attr, msg)
+        } else {
+          setInactive(pos)
+        }
       } else {
-        attrs(pos) = vprog(attrs(pos), defaultMsg)
+        attrs(pos) = vprog(attr, defaultMsg)
       }
     }
-
 
     this
   }
 
   // mask methods
-  def setMask(vid: VertexId): this.type = {
-    mask.set(global2local(vid))
+  def setInactive(pos: Int): this.type = {
+    mask.unset(pos)
     this
   }
 
-  def unMask(vid: VertexId): this.type = {
-    mask.unset(global2local(vid))
+  def setActive(pos: Int): this.type = {
+    mask.set(pos)
     this
   }
 
-  def isMask(vid: VertexId): Boolean = mask.get(global2local(vid))
+  def isActive(pos: Int): Boolean = mask.get(pos)
 
   def clearMask(): this.type = {
     mask.clear()
@@ -85,7 +90,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   def activeVerticesCount(): Int = mask.capacity
 
   // slots operations
-  def createSlot[V: ClassTag: TypeTag](name: String): this.type = slotRefMap.synchronized {
+  def createSlot[V: ClassTag : TypeTag](name: String): this.type = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap
@@ -106,7 +111,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     this
   }
 
-  def getOrCreateSlot[V: ClassTag: TypeTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
+  def getOrCreateSlot[V: ClassTag : TypeTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap

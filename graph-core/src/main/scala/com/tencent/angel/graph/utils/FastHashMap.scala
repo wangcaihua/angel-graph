@@ -1,11 +1,8 @@
 package com.tencent.angel.graph.utils
 
-import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.vector._
 import io.netty.buffer.ByteBuf
-import it.unimi.dsi.fastutil.ints._
-import it.unimi.dsi.fastutil.longs._
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
@@ -507,87 +504,38 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
     temp
   }
 
-  def toUnimi[T]: T = {
-    val unimiMap = (keyTag, valueTag) match {
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Boolean] =>
-        new Int2BooleanOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Char] =>
-        new Int2CharOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Byte] =>
-        new Int2ByteOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Short] =>
-        new Int2ShortOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Int] =>
-        new Int2IntOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Long] =>
-        new Int2LongOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Float] =>
-        new Int2FloatOpenHashMap()
-      case (kt, vt) if kt == classOf[Int] && vt == classOf[Double] =>
-        new Int2DoubleOpenHashMap()
-      case (kt, _) if kt == classOf[Int] =>
-        new Int2ObjectOpenHashMap[V]()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Boolean] =>
-        new Long2BooleanOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Char] =>
-        new Long2CharOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Byte] =>
-        new Long2ByteOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Short] =>
-        new Long2ShortOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Int] =>
-        new Long2IntOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Long] =>
-        new Long2LongOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Float] =>
-        new Long2FloatOpenHashMap()
-      case (kt, vt) if kt == classOf[Long] && vt == classOf[Double] =>
-        new Long2DoubleOpenHashMap()
-      case (kt, _) if kt == classOf[Long] =>
-        new Long2ObjectOpenHashMap[V]()
-    }
-
-    FastHashMap.toUnimi[K, V](keys, values, containsNullKey, n, f,
-      numElements, unimiMap).asInstanceOf[T]
-  }
-
-  def asIdMaps: (FastHashMap[VertexId, Int], Array[VertexId]) = {
-    assert(keyTag == classOf[VertexId])
-
-    val local2global = new Array[VertexId](size())
-
-    val temp = if (valueTag == classOf[Int]) {
-      values.asInstanceOf[Array[Int]]
-    } else {
-      new Array[Int](keys.length)
-    }
-
-    var reIdx = 0
-    keys.zipWithIndex.foreach {
-      case (key, idx) if key != nullKey =>
-        temp(idx) = reIdx
-        local2global(reIdx) = key.asInstanceOf[VertexId]
-        reIdx += 1
-      case _ =>
-    }
-
-    if (containsNullKey && values(n) != defaultValue) {
-      temp(n) = reIdx
-      local2global(reIdx) = 0
-    }
-
-    if (valueTag == classOf[Int]) {
-      this.asInstanceOf[FastHashMap[VertexId, Int]] -> local2global
-    } else {
-      new FastHashMap[VertexId, Int](keys.asInstanceOf[Array[VertexId]], temp,
-        containsNullKey, n, f, numElements) -> local2global
-    }
-  }
-
   def empty(): FastHashMap[K, V] = new FastHashMap[K, V]
 
+  def merge(other: FastHashMap[K, V]): this.type = {
+    val comSize = numElements + other.size()
+    if (comSize - 1 >= maxFill) {
+      rehash(arraySize(comSize + 1, f))
+    }
+
+    other.foreach{ case (k, v) => update(k, v) }
+
+    this
+  }
+
+  def merge(other: FastHashMap[K, V], mergeF: (V, V) => V): this.type = {
+    val comSize = numElements + other.size()
+    if (comSize - 1 >= maxFill) {
+      rehash(arraySize(comSize + 1, f))
+    }
+
+    other.foreach{ case (k, v) =>
+      if (containsKey(k)) {
+        update(k, mergeF(apply(k), v))
+      } else {
+        update(k, v)
+      }
+    }
+
+    this
+  }
+
   override def serialize(byteBuf: ByteBuf): Unit = {
-    byteBuf.writeInt(numElements)
+    byteBuf.writeInt(size())
     if (keyTag == classOf[Int]) {
       valueTag match {
         case vclz if vclz == classOf[Boolean] =>
@@ -962,21 +910,21 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
     if (keyTag == classOf[Int]) {
       valueTag match {
         case vclz if vclz == classOf[Boolean] =>
-          len += numElements * (SerDe.boolSize + 4)
+          len += size() * (SerDe.boolSize + 4)
         case vclz if vclz == classOf[Char] =>
-          len += numElements * (SerDe.charSize + 4)
+          len += size() * (SerDe.charSize + 4)
         case vclz if vclz == classOf[Byte] =>
-          len += numElements * 5
+          len += size() * 5
         case vclz if vclz == classOf[Short] =>
-          len += numElements * (SerDe.shortSize + 4)
+          len += size() * (SerDe.shortSize + 4)
         case vclz if vclz == classOf[Int] =>
-          len += numElements * 8
+          len += size() * 8
         case vclz if vclz == classOf[Long] =>
-          len += numElements * 12
+          len += size() * 12
         case vclz if vclz == classOf[Float] =>
-          len += numElements * 8
+          len += size() * 8
         case vclz if vclz == classOf[Double] =>
-          len += numElements * 12
+          len += size() * 12
         case vclz if vclz == classOf[String] =>
           iterator.foreach { case (_, v: String) =>
             val bytes = v.getBytes()
@@ -1003,21 +951,21 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
     } else {
       valueTag match {
         case vclz if vclz == classOf[Boolean] =>
-          len += numElements * (SerDe.boolSize + 8)
+          len += size() * (SerDe.boolSize + 8)
         case vclz if vclz == classOf[Char] =>
-          len += numElements * (SerDe.charSize + 8)
+          len += size() * (SerDe.charSize + 8)
         case vclz if vclz == classOf[Byte] =>
-          len += numElements * 9
+          len += size() * 9
         case vclz if vclz == classOf[Short] =>
-          len += numElements * (SerDe.shortSize + 8)
+          len += size() * (SerDe.shortSize + 8)
         case vclz if vclz == classOf[Int] =>
-          len += numElements * 12
+          len += size() * 12
         case vclz if vclz == classOf[Long] =>
-          len += numElements * 16
+          len += size() * 16
         case vclz if vclz == classOf[Float] =>
-          len += numElements * 12
+          len += size() * 12
         case vclz if vclz == classOf[Double] =>
-          len += numElements * 16
+          len += size() * 16
         case vclz if vclz == classOf[String] =>
           iterator.foreach { case (_, v: String) =>
             val bytes = v.getBytes()
@@ -1050,10 +998,6 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
 object FastHashMap {
 
   import com.tencent.angel.graph.utils.HashCommon._
-
-  def getIdMaps(empty: Any): (FastHashMap[VertexId, Int], Array[VertexId]) = {
-    fromUnimi[VertexId, Int](empty).asIdMaps
-  }
 
   def fromUnimi[K: ClassTag, V: ClassTag : TypeTag](empty: Any): FastHashMap[K, V] = {
     val keys: Array[K] = getField[Array[K]](empty, "key")
