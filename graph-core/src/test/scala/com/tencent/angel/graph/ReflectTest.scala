@@ -1,8 +1,12 @@
 package com.tencent.angel.graph
 
 
-import com.tencent.angel.ml.math2.VFactory
+import com.tencent.angel.graph.core.data.{NeighN, NeighNW, NeighTN, NeighTNW}
+import com.tencent.angel.graph.utils.{FastHashMap, ReflectUtils}
+import com.tencent.angel.ml.math2.vector._
 import io.netty.buffer.{ByteBuf, Unpooled}
+import it.unimi.dsi.fastutil.ints._
+import it.unimi.dsi.fastutil.longs._
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe._
@@ -18,6 +22,22 @@ class ReflectTest extends AnyFunSuite {
   }
 
   test("vector") {
-    println("hello world!")
+
+    println(ReflectUtils.typeFromString(typeOf[VertexId].toString))
+    println(ReflectUtils.typeFromString(typeOf[Int].toString))
+    println(ReflectUtils.typeFromString(typeOf[IntDoubleVector].toString))
+    println(ReflectUtils.typeFromString(typeOf[Int2LongOpenHashMap].toString))
+    println(ReflectUtils.typeFromString(typeOf[NeighN].toString))
+    println(ReflectUtils.typeFromString(typeOf[Array[VertexId]].toString))
+    println(ReflectUtils.typeFromString(typeOf[Array[Int]].toString))
+    println(ReflectUtils.typeFromString(typeOf[Array[IntDoubleVector]].toString))
+    println(ReflectUtils.typeFromString(typeOf[Array[Int2LongOpenHashMap]].toString))
+    println(ReflectUtils.typeFromString(typeOf[Array[NeighN]].toString))
+
+    println(ReflectUtils.typeFromString(typeOf[FastHashMap[VertexId, Int]].toString))
+    println(ReflectUtils.typeFromString(typeOf[FastHashMap[VertexId, Int]].toString))
+
+
+
   }
 }

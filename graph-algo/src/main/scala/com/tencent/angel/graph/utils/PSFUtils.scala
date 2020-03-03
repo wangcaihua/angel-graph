@@ -8,11 +8,12 @@ import com.tencent.angel.ml.matrix.{MatrixContext, RowType}
 import com.tencent.angel.spark.models.PSMatrix
 import org.apache.spark.compat.CUtils
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 object PSFUtils {
-  def createGet[U: TypeTag](getFunc: PSFGUCtx => U)
-                           (mergeFunc: PSFMCtx => U): GetPSF[U] = {
+  def createGet[U: ClassTag : TypeTag](getFunc: PSFGUCtx => U)
+                                      (mergeFunc: PSFMCtx => U): GetPSF[U] = {
     val cleanedGetFunc = CUtils.clean(getFunc)
 
     val getOp = GetOp(cleanedGetFunc)

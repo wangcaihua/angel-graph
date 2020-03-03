@@ -10,7 +10,7 @@ import scala.reflect.runtime.universe._
 
 
 trait GetOp extends Serializable {
-  def apply(pgParam: PSFGUCtx): (TypeTag[_], Any)
+  def apply(pgParam: PSFGUCtx): (Type, Any)
 }
 
 
@@ -21,10 +21,10 @@ object GetOp {
 
   def apply[U: TypeTag](func: PSFGUCtx => U): GetOp = {
     new GetOp with Serializable {
-      override def apply(pgParam: PSFGUCtx): (TypeTag[_], Any) = {
+      override def apply(pgParam: PSFGUCtx): (Type, Any) = {
         val result = func(pgParam)
 
-        ReflectUtils.getTypeTag(result) -> result
+        ReflectUtils.getType(result) -> result
       }
     }
   }

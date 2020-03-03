@@ -8,7 +8,7 @@ import com.tencent.angel.graph.utils.Logging
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
-object Pregel extends Logging {
+object Pregel extends Logging with Serializable {
   def apply[VD: ClassTag : TypeTag, ED: ClassTag, M: ClassTag : TypeTag]
   (graph: Graph[VD, ED], initialMsg: M,
    maxIterations: Int = Int.MaxValue, batchSize: Int = -1,
@@ -28,6 +28,7 @@ object Pregel extends Logging {
       case _ => EdgeActiveness.Neither
     }
 
+    logInfo("initVertex")
     graph.initVertex(vprog, active, initialMsg)
 
     // compute the messages

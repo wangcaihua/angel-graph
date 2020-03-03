@@ -16,8 +16,7 @@ import scala.reflect.runtime.universe._
 class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: Int)
   extends UpdateParam(mId, uClock) {
 
-  private val typeTag = implicitly[TypeTag[T]]
-  private val tpe = typeTag.tpe
+  private val tpe = typeOf[T]
 
   override def split(): util.List[PartitionUpdateParam] = {
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
@@ -29,7 +28,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
 
       splitters.foreach { splitter =>
         val pp = new GPartitionUpdateParam(matrixId, splitter.part, updateClock,
-          splitter, typeTag, params, operation)
+          splitter, tpe, params, operation)
         splits.add(pp)
       }
 
@@ -40,7 +39,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
       val splits = new util.ArrayList[PartitionUpdateParam](splitters.size)
       splitters.foreach { splitter =>
         val pp = new GPartitionUpdateParam(matrixId, splitter.part, updateClock,
-          splitter, typeTag, params, operation)
+          splitter, tpe, params, operation)
         splits.add(pp)
       }
 
@@ -49,7 +48,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
       val splits = new util.ArrayList[PartitionUpdateParam](1)
       val idx = params.asInstanceOf[Singular].partition
       val pp = new GPartitionUpdateParam(matrixId, parts.get(idx), updateClock,
-        NonSplitter(), typeTag, params, operation)
+        NonSplitter(), tpe, params, operation)
       splits.add(pp)
       splits
     } else {
@@ -57,7 +56,7 @@ class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: 
         val splits = new util.ArrayList[PartitionUpdateParam](parts.size)
         (0 until parts.size()).foreach { idx =>
           val pp = new GPartitionUpdateParam(matrixId, parts.get(idx), updateClock,
-            NonSplitter(), typeTag, params, operation)
+            NonSplitter(), tpe, params, operation)
           splits.add(pp)
         }
 
@@ -88,14 +87,14 @@ object GUpdateParam {
 }
 
 class GPartitionUpdateParam(mId: Int, part: PartitionKey, uClock: Boolean,
-                            splitter: Splitter, var tt: TypeTag[_], var params: Any, var operation: Any)
+                            splitter: Splitter, var tpe: Type, var params: Any, var operation: Any)
   extends PartitionUpdateParam(mId, part, uClock) {
 
   def this() = this(0, null, false, null, null, null, null)
 
   override def serialize(buf: ByteBuf): Unit = {
     super.serialize(buf)
-    ParamSerDe.serializeSplit(splitter, tt, params, buf)
+    ParamSerDe.serializeSplit(splitter, tpe, params, buf)
 
     val dataObj = UpdateOp.get(operation.asInstanceOf[Int])
     buf.writeInt(dataObj.length).writeBytes(dataObj)
@@ -105,14 +104,14 @@ class GPartitionUpdateParam(mId: Int, part: PartitionKey, uClock: Boolean,
     super.deserialize(buf)
     val (t, p) = ParamSerDe.deserializeSplit(buf)
 
-    tt = t
+    tpe = t
     params = p
     operation = SerDe.javaDeserialize[UpdateOp](buf)
   }
 
   override def bufferLen(): Int = {
     var len = super.bufferLen()
-    len += ParamSerDe.bufferLenSplit(splitter, tt, params)
+    len += ParamSerDe.bufferLenSplit(splitter, tpe, params)
     len += UpdateOp.get(operation.asInstanceOf[Int]).length + 4
 
     len

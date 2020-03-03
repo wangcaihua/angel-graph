@@ -504,7 +504,9 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
     temp
   }
 
-  def empty(): FastHashMap[K, V] = new FastHashMap[K, V]
+  def emptyLike(): FastHashMap[K, V] = new FastHashMap[K, V]
+
+  def emptyLike(initSize: Int): FastHashMap[K, V] = new FastHashMap[K, V](initSize)
 
   def merge(other: FastHashMap[K, V]): this.type = {
     val comSize = numElements + other.size()

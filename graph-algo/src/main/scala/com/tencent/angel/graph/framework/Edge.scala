@@ -128,7 +128,7 @@ case class EdgeTriplet[VD, ED](srcId: VertexId, dstId: VertexId, srcAttr: VD, ds
   def dst: Node[VD] = Node(dstId, dstAttr)
 }
 
-class TripletFields(val useSrc: Boolean, val useDst: Boolean, val useEdge: Boolean)
+class TripletFields(val useSrc: Boolean, val useDst: Boolean, val useEdge: Boolean) extends Serializable
 
 object TripletFields {
   def apply(): TripletFields = {

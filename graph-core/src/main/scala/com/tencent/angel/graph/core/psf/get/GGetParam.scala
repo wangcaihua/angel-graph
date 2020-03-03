@@ -16,8 +16,7 @@ import io.netty.buffer.ByteBuf
 class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: Int)
   extends GetParam(mId) {
 
-  private val typeTag = implicitly[TypeTag[T]]
-  private val tpe = typeTag.tpe
+  private val tpe = typeOf[T]
 
   override def split(): util.List[PartitionGetParam] = {
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
@@ -28,7 +27,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 
       val splits = new util.ArrayList[PartitionGetParam](splitters.size)
       splitters.foreach { splitter =>
-        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, typeTag, params,
+        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params,
           getFuncId, mergeFuncId)
         splits.add(pp)
       }
@@ -39,7 +38,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
 
       val splits = new util.ArrayList[PartitionGetParam](splitters.size)
       splitters.foreach { splitter =>
-        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, typeTag, params,
+        val pp = new GPartitionGetParam(matrixId, splitter.part, splitter, tpe, params,
           getFuncId, mergeFuncId)
         splits.add(pp)
       }
@@ -48,7 +47,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
     } else if (tpe <:< typeOf[Singular]) {
       val splits = new util.ArrayList[PartitionGetParam]()
       val idx = params.asInstanceOf[Singular].partition
-      val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), typeTag, params,
+      val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), tpe, params,
         getFuncId, mergeFuncId)
       splits.add(pp)
       splits
@@ -56,7 +55,7 @@ class GGetParam[T: TypeTag](mId: Int, params: T, getFuncId: Int, mergeFuncId: In
       try {
         val splits = new util.ArrayList[PartitionGetParam](parts.size())
         (0 until parts.size()).foreach { idx =>
-          val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), typeTag, params,
+          val pp = new GPartitionGetParam(matrixId, parts.get(idx), NonSplitter(), tpe, params,
             getFuncId, mergeFuncId)
           splits.add(pp)
         }
@@ -81,14 +80,14 @@ object GGetParam {
 
 
 class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
-                         var tt: TypeTag[_], var params: Any, var getFunc: Any, var mergeFunc: Any)
+                         var tpe: Type, var params: Any, var getFunc: Any, var mergeFunc: Any)
   extends PartitionGetParam(mId, pKey) {
 
   def this() = this(0, null, null, null, null, null, null)
 
   override def serialize(buf: ByteBuf): Unit = {
     super.serialize(buf)
-    ParamSerDe.serializeSplit(splitter, tt, params, buf)
+    ParamSerDe.serializeSplit(splitter, tpe, params, buf)
 
     val dataObj = GetOp.get(getFunc.asInstanceOf[Int])
     buf.writeInt(dataObj.length).writeBytes(dataObj)
@@ -100,7 +99,7 @@ class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
     super.deserialize(buf)
     val (t, p) = ParamSerDe.deserializeSplit(buf)
 
-    tt = t
+    tpe = t
     params = p
 
     getFunc = SerDe.javaDeserialize[GetOp](buf)
@@ -109,7 +108,7 @@ class GPartitionGetParam(mId: Int, pKey: PartitionKey, splitter: Splitter,
 
   override def bufferLen(): Int = {
     var len = super.bufferLen()
-    len += ParamSerDe.bufferLenSplit(splitter, tt, params)
+    len += ParamSerDe.bufferLenSplit(splitter, tpe, params)
     len += GetOp.get(getFunc.asInstanceOf[Int]).length + 8
     len
   }

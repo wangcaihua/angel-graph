@@ -10,10 +10,9 @@ import scala.reflect.runtime.universe._
 
 object ParamSerDe {
 
-  def serializeSplit(splitter: Splitter, tt: TypeTag[_], params: Any, buf: ByteBuf): Unit = {
-    SerDe.javaSerialize(tt, buf)
+  def serializeSplit(splitter: Splitter, tpe: Type, params: Any, buf: ByteBuf): Unit = {
+    SerDe.serPrimitive(tpe.toString, buf)
 
-    val tpe = tt.tpe
     splitter match {
       case split: RangeSplitter =>
         if (GUtils.isPrimitiveArray(tpe)) {
@@ -40,9 +39,9 @@ object ParamSerDe {
     }
   }
 
-  def deserializeSplit(buf: ByteBuf): (TypeTag[_], Any) = {
-    val tt = SerDe.javaDeserialize[TypeTag[_]](buf)
-    val tpe = tt.tpe
+  def deserializeSplit(buf: ByteBuf): (Type, Any) = {
+    val tpe = ReflectUtils.typeFromString(
+      SerDe.primitiveFromBuffer[String](buf))
 
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)
@@ -66,14 +65,11 @@ object ParamSerDe {
       }
     }
 
-    (tt, params)
+    (tpe, params)
   }
 
-  def bufferLenSplit(splitter: Splitter, tt: TypeTag[_], params: Any): Int = {
-    var len = 0
-
-    len += SerDe.javaSerBufferSize(tt)
-    val tpe = tt.tpe
+  def bufferLenSplit(splitter: Splitter, tpe: Type, params: Any): Int = {
+    var len = SerDe.serPrimitiveBufSize(tpe.toString)
 
     splitter match {
       case split: RangeSplitter =>

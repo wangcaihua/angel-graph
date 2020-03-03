@@ -4,18 +4,16 @@ package com.tencent.angel.graph.framework
 import java.util.UUID
 
 import com.tencent.angel.graph._
-import com.tencent.angel.graph.core.data.PSPartition
+import com.tencent.angel.graph.core.data.{NeighN, NeighNW, NeighTN, NeighTNW, Neighbor}
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx, Singular}
 import com.tencent.angel.graph.core.psf.get.GetPSF
 import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
 import com.tencent.angel.graph.utils.psfConverters._
-import com.tencent.angel.graph.utils.{BitSet, FastHashMap, Logging, PSFUtils}
+import com.tencent.angel.graph.utils.{FastHashMap, Logging, PSFUtils, PartitionTypedNeighborBuilder, PartitionUnTypedNeighborBuilder, TypedNeighborBuilder, UnTypedNeighborBuilder}
 import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.spark.models.PSMatrix
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -54,7 +52,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     }
 
     val createPSPartition = psMatrix.createUpdate { ctx: PSFGUCtx =>
-      ctx.getOrCreatePartition[Int]
+      ctx.getOrCreatePartition[VD]
     }
     createPSPartition()
     createPSPartition.clear()

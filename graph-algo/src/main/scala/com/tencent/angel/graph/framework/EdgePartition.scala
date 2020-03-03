@@ -466,8 +466,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
 private class AggregatingEdgeContext[VD, ED, M](mergeMsg: (M, M) => M,
                                                 aggregates: Array[M],
                                                 bitSet: BitSet
-                                               )
-  extends EdgeContext[VD, ED, M] {
+                                               ) extends EdgeContext[VD, ED, M] with Serializable {
   private[this] var _localSrcId: Int = _
   private[this] var _localDstId: Int = _
 

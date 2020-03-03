@@ -9,6 +9,7 @@ import com.tencent.angel.spark.models.PSMatrix
 import org.apache.spark.TaskContext
 
 import scala.language.implicitConversions
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 class PSFGen(psMat: PSMatrix) {
@@ -24,7 +25,7 @@ class PSFGen(psMat: PSMatrix) {
 object psfConverters {
 
   implicit class GetPSFGen(psMatrix: PSMatrix) extends PSFGen(psMatrix) {
-    def createGet[U: TypeTag](getFunc: PSFGUCtx => U)
+    def createGet[U: ClassTag: TypeTag](getFunc: PSFGUCtx => U)
                              (mergeFunc: PSFMCtx => U): GetPSF[U] = {
       PSFUtils.createGet[U](getFunc)(mergeFunc).bind(matClient)
     }
