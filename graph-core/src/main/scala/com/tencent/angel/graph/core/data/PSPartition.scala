@@ -2,7 +2,7 @@ package com.tencent.angel.graph.core.data
 
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.sampler.{Reservoir, SampleK, SampleOne, Simple}
-import com.tencent.angel.graph.utils.{BitSet, FastHashMap, RefHashMap}
+import com.tencent.angel.graph.utils.{BitSet, FastHashMap, Logging, RefHashMap}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -10,9 +10,14 @@ import scala.reflect.runtime.universe._
 
 
 class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
-                                val local2global: Array[VertexId]) {
+                                val local2global: Array[VertexId]) extends Logging {
   private lazy val attrs: Array[VD] = new Array[VD](global2local.size())
-  private lazy val mask: BitSet = new BitSet(global2local.size())
+  private lazy val mask: BitSet = {
+    val bs = new BitSet(global2local.size())
+    local2global.indices.foreach(idx => bs.set(idx))
+    bs
+  }
+
   private lazy val message: Array[Any] = new Array[Any](global2local.size())
   private lazy val slotRefMap = new mutable.HashMap[String, RefHashMap[_]]()
 
@@ -40,13 +45,17 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     this
   }
 
-  def updateAttrs[M](update: (VD, M) => VD): this.type = {
-    var i = 0
-    while (i < attrs.length) {
-      attrs(i) = update(attrs(i), message(i).asInstanceOf[M])
-      message(i) = null.asInstanceOf[M]
-      i += 1
+  def updateAttrs[M](vprog: (VD, M) => VD, defaultMsg: M): this.type ={
+    attrs.indices.foreach{ pos =>
+      val msg = message(pos).asInstanceOf[M]
+
+      if (msg != null) {
+        attrs(pos) = vprog(attrs(pos), msg)
+      } else {
+        attrs(pos) = vprog(attrs(pos), defaultMsg)
+      }
     }
+
 
     this
   }
@@ -72,6 +81,8 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   def activeVertices(): Array[VertexId] = {
     mask.iterator.map(pos => local2global(pos)).toArray
   }
+
+  def activeVerticesCount(): Int = mask.capacity
 
   // slots operations
   def createSlot[V: ClassTag: TypeTag](name: String): this.type = slotRefMap.synchronized {

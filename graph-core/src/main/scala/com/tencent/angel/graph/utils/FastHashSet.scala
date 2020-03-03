@@ -301,5 +301,17 @@ class FastHashSet[@spec(Int, Long) T: ClassTag](expected: Int, f: Float) extends
   /** Return the value at the specified position. */
   def getValueSafe(pos: Int): T = data(pos)
 
+  def toArray: Array[T] = {
+    val temp = new Array[T](numElements)
+    var idx = 0
+    data.foreach { k =>
+      if (k != nullKey) {
+        temp(idx) = k
+        idx += 1
+      }
+    }
+
+    temp
+  }
 }
 

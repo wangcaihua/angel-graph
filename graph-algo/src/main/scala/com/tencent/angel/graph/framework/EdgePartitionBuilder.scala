@@ -1,7 +1,7 @@
 package com.tencent.angel.graph.framework
 
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
-import com.tencent.angel.graph.utils.{FastArray, FastHashMap, SortDataFormat, Sorter}
+import com.tencent.angel.graph.utils.{FastArray, FastHashMap, Logging, SortDataFormat, Sorter}
 import com.tencent.angel.graph.{VertexId, VertexSet}
 
 import scala.reflect._
@@ -9,7 +9,7 @@ import scala.{specialized => spec}
 import scala.reflect.runtime.universe.TypeTag
 
 class EdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Int, Long, Float, Double) ED: ClassTag]
-(size: Int = 64, edgeDirection: EdgeDirection = EdgeDirection.Out) {
+(size: Int = 64, edgeDirection: EdgeDirection = EdgeDirection.Out) extends Logging {
   private val edges = new FastArray[Edge[ED]](size)
 
   def add(srcId: VertexId, dstId: VertexId, attr: ED): this.type = {

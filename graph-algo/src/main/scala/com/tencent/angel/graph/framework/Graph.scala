@@ -5,9 +5,12 @@ import java.util.UUID
 
 import com.tencent.angel.graph._
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx, Singular}
+import com.tencent.angel.graph.core.psf.get.GetPSF
+import com.tencent.angel.graph.core.psf.update.UpdatePSF
+import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
-import com.tencent.angel.graph.utils.{FastHashMap, PSFUtils, ReflectUtils}
 import com.tencent.angel.graph.utils.psfConverters._
+import com.tencent.angel.graph.utils.{FastHashMap, Logging, PSFUtils}
 import com.tencent.angel.psagent.PSAgentContext
 import com.tencent.angel.spark.models.PSMatrix
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
@@ -20,14 +23,17 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 
-class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]]) extends Serializable {
+class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[VD, ED]])
+  extends Serializable with Logging {
   private val psMatrixName = s"PSPartition_${UUID.randomUUID()}"
-  lazy val maxVertexId: VertexId = edges.mapPartitions { iter =>
+  logInfo(s"psMatrixName is $psMatrixName")
+
+  val maxVertexId: VertexId = edges.mapPartitions { iter =>
     val part = iter.next()
     Iterator.single(part.maxVertexId)
   }.max()
 
-  lazy val minVertexId: VertexId = edges.mapPartitions { iter =>
+  val minVertexId: VertexId = edges.mapPartitions { iter =>
     val part = iter.next()
     Iterator.single(part.minVertexId)
   }.min()
@@ -52,30 +58,33 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     createPSPartition()
     createPSPartition.clear()
 
+    logInfo("Finished to create PSMatrix")
+
     psMatrix
   }
 
   val numPsPartition: Int = PSAgentContext.get.getMatrixMetaManager
     .getPartitions(psVertices.id).size()
+  logInfo(s"numPsPartition is $numPsPartition")
 
   var vertices: RDD[NodePartition[VD]] = edges.sparkContext
-    .parallelize(0 until numPsPartition, numPsPartition).mapPartitions{ iter =>
+    .parallelize(0 until numPsPartition, numPsPartition).mapPartitions { iter =>
     val partId = iter.next()
 
-    val pullAttr = psVertices.createGet{ ctx: PSFGUCtx =>
+    val pullAttr = psVertices.createGet { ctx: PSFGUCtx =>
       val pid = ctx.getParam[Singular]
       assert(pid.partition == ctx.partitionId)
 
       val partition = ctx.getPartition[VD]
 
       val result = new FastHashMap[VertexId, VD](partition.local2global.length)
-      partition.local2global.foreach{ vid => result(vid) = partition.getAttr(vid) }
+      partition.local2global.foreach { vid => result(vid) = partition.getAttr(vid) }
       result
     } { ctx: PSFMCtx =>
       val last = ctx.getLast[FastHashMap[VertexId, VD]]
       val curr = ctx.getCurr[FastHashMap[VertexId, VD]]
 
-      curr.foreach{ case (k, v) => last(k) = v}
+      curr.foreach { case (k, v) => last(k) = v }
 
       last
     }
@@ -87,7 +96,38 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     Iterator.single(nodePartition)
   }
 
-  def untypedAdjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
+  private var updateVertexPSF: UpdatePSF = _
+
+  def initVertex[M: TypeTag](vprog: (VD, M) => VD, defaultMsg: M): this.type = {
+    if (updateVertexPSF == null) {
+      updateVertexPSF = psVertices.createUpdate { ctx: PSFGUCtx =>
+        val part = ctx.getPartition[VD]
+        part.updateAttrs(vprog, defaultMsg)
+      }
+    }
+
+    updateVertexPSF()
+
+    this
+  }
+
+  def updateVertex[M: TypeTag](vprog: (VD, M) => VD): this.type = {
+    initVertex(vprog, null.asInstanceOf[M])
+  }
+
+  private var activeMessageCountPSF: GetPSF[Int] = _
+
+  def activeMessageCount(): Int = {
+    if (activeMessageCountPSF == null) {
+      activeMessageCountPSF = psVertices.createGet { ctx: PSFGUCtx =>
+        ctx.getPartition[VD].activeVerticesCount()
+      } { ctx: PSFMCtx => ctx.getLast[Int] + ctx.getCurr[Int] }
+    }
+
+    activeMessageCountPSF()
+  }
+
+  def adjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
     edges.foreachPartition { iter =>
       Neighbor.register()
 
@@ -249,6 +289,27 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val edges: RDD[EdgePartition[V
     createAdjacency.clear() // remove PSF (on driver)
 
     this
+  }
+
+  private[graph] def aggregateMessagesWithActiveSet[M: ClassTag : TypeTag](sendMsg: EdgeContext[VD, ED, M] => Unit,
+                                                                           mergeMsg: (M, M) => M,
+                                                                           tripletFields: TripletFields,
+                                                                           batchSize: Int = -1,
+                                                                           activeness: EdgeActiveness): Unit = {
+    edges.foreachPartition { iter =>
+      val edgePartition: EdgePartition[VD, ED] = iter.next()
+      edgePartition.setPSMatrix(psVertices)
+
+      logInfo(s"updateVertexAttrs with batchSize $batchSize")
+      edgePartition.updateVertexAttrs(batchSize)
+
+      logInfo(s"updateActiveSet with batchSize $batchSize")
+      edgePartition.updateActiveSet(batchSize)
+
+      logInfo(s"aggregateMessagesScan with batchSize $batchSize")
+      edgePartition.aggregateMessagesScan(sendMsg, mergeMsg, tripletFields, activeness, batchSize)
+    }
+
   }
 }
 

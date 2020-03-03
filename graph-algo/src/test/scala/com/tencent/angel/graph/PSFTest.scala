@@ -1,5 +1,7 @@
 package com.tencent.angel.graph
 
+import java.nio.ByteBuffer
+
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx}
 import com.tencent.angel.graph.utils.psfConverters._
 import com.tencent.angel.ml.matrix.RowType
@@ -17,10 +19,6 @@ class PSFTest extends WithSONA {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-  }
-
-  test("read data") {
-    println("hello world!")
   }
 
   test("pull/push") {
