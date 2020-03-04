@@ -11,7 +11,7 @@ import com.tencent.angel.graph.{VertexId, _}
 
 object PageRank extends Logging with Serializable {
   def apply(graph: Graph[Float, Long], numIter: Int, batchSize: Int,
-          resetProb: Float = 0.15f, activeDirection: EdgeDirection = EdgeDirection.Both): Graph[Float, Long] = {
+    resetProb: Float = 0.15f, activeDirection: EdgeDirection = EdgeDirection.Both): Graph[Float, Long] = {
 
     val degreeSlotName = "degreeBoth"
     graph.calDegree(degreeSlotName)

@@ -147,8 +147,10 @@ object SerDe {
     if (arr == null || end - start <= 1) {
       byteBuf.writeInt(0)
     } else {
+      val temp = arr.asInstanceOf[Array[_]]
+      assert(end <= temp.length && start >= 0)
       byteBuf.writeInt(end - start)
-      arr.asInstanceOf[Array[_]].head match {
+      temp.head match {
         case _: Boolean =>
           val array = arr.asInstanceOf[Array[Boolean]]
           (start until end).foreach(idx => byteBuf.writeBoolean(array(idx)))
@@ -263,8 +265,10 @@ object SerDe {
   def serArrBufSize(arr: Any, start: Int, end: Int): Int = {
     var len = 4
     val length = end - start
-    if (arr != null && end - start <= 1) {
-      arr.asInstanceOf[Array[_]].head match {
+    if (arr != null && end - start >= 1) {
+      val temp = arr.asInstanceOf[Array[_]]
+      assert(end <= temp.length && start >= 0)
+      temp.head match {
         case _: Boolean =>
           len += length * boolSize
         case _: Byte =>
@@ -302,7 +306,7 @@ object SerDe {
       map match {
         case fast: FastHashMap[_, _] =>
           fast.serialize(byteBuf)
-        case i2bo: Int2BooleanArrayMap =>
+        case i2bo: Int2BooleanOpenHashMap =>
           byteBuf.writeInt(i2bo.size())
           val iter = i2bo.int2BooleanEntrySet().fastIterator()
           while (iter.hasNext) {
