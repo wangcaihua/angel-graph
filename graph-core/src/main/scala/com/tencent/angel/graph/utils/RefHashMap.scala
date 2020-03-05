@@ -4,12 +4,11 @@ import com.tencent.angel.graph.VertexId
 import io.netty.buffer.ByteBuf
 
 import scala.reflect._
-import scala.reflect.runtime.universe._
 
-class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int],
-                                        local2global: Array[VertexId],
-                                        private val values: Array[V],
-                                        private val bitSet: BitSet)
+class RefHashMap[V: ClassTag](global2local: FastHashMap[VertexId, Int],
+                              local2global: Array[VertexId],
+                              private val values: Array[V],
+                              private val bitSet: BitSet)
   extends FastHashMap[VertexId, V](null, null, false, 0, 0.75f, 0) {
 
   def this(global2local: FastHashMap[VertexId, Int], local2global: Array[VertexId], values: Array[V]) = {
@@ -186,7 +185,7 @@ class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int]
     }
   }
 
-  override def mapValues[U: ClassTag : TypeTag](func: V => U): RefHashMap[U] = {
+  override def mapValues[U: ClassTag](func: V => U): RefHashMap[U] = {
     val newValues = new Array[U](values.length)
     val newBitSet = new BitSet(values.length)
 
@@ -203,7 +202,7 @@ class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int]
     val iter = bitSet.iterator
     var idx = 0
 
-    while(iter.hasNext) {
+    while (iter.hasNext) {
       temp(idx) = local2global(iter.next())
       idx += 1
     }
@@ -216,7 +215,7 @@ class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int]
     val iter = bitSet.iterator
     var idx = 0
 
-    while(iter.hasNext) {
+    while (iter.hasNext) {
       temp(idx) = values(iter.next())
       idx += 1
     }
@@ -225,12 +224,12 @@ class RefHashMap[V: ClassTag : TypeTag](global2local: FastHashMap[VertexId, Int]
   }
 
   override def merge(other: FastHashMap[VertexId, V]): this.type = {
-    other.foreach{ case (k, v) => update(k, v) }
+    other.foreach { case (k, v) => update(k, v) }
     this
   }
 
   override def merge(other: FastHashMap[VertexId, V], mergeF: (V, V) => V): this.type = {
-    other.foreach{ case (k, v) =>
+    other.foreach { case (k, v) =>
       if (containsKey(k)) {
         update(k, mergeF(apply(k), v))
       } else {

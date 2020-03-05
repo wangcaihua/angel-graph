@@ -1,22 +1,10 @@
 package com.tencent.angel.graph.core.data
 
 import com.tencent.angel.graph.core.sampler._
-import com.tencent.angel.graph.utils.{FastHashMap, ReflectUtils}
 import com.tencent.angel.graph.{VertexId, VertexType, WgtTpe}
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap
 
-import scala.reflect.runtime.universe._
-
 trait Neighbor extends GData
-
-object Neighbor {
-  def register(): Unit = {
-    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighN]], new FastHashMap[VertexId, NeighN]())
-    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighNW]], new FastHashMap[VertexId, NeighNW]())
-    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighTN]], new FastHashMap[VertexId, NeighTN]())
-    ReflectUtils.register(typeOf[FastHashMap[VertexId, NeighTNW]], new FastHashMap[VertexId, NeighTNW]())
-  }
-}
 
 trait UnTyped {
   def sample(): VertexId

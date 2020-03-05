@@ -287,36 +287,6 @@ class EdgePartition[VD: ClassTag : TypeTag,
     builder.build
   }
 
-  def innerJoin[ED2: ClassTag, ED3: ClassTag](other: EdgePartition[_, ED2])
-                                             (f: (VertexId, VertexId, ED, ED2) => ED3): EdgePartition[VD, ED3] = {
-    val builder = new ExistingEdgePartitionBuilder[VD, ED3](
-      global2local, local2global, vertexAttrs, localDegreeHist, activeSet)
-    var i = 0
-    var j = 0
-    // For i = index of each edge in `this`...
-    while (i < size && j < other.size) {
-      val srcId = this.srcIdFromPos(i)
-      val dstId = this.dstIdFromPos(i)
-      // ... forward j to the index of the corresponding edge in `other`, and...
-
-      while (j < other.size && other.srcIdFromPos(j) < srcId) {
-        j += 1
-      }
-      if (j < other.size && other.srcIdFromPos(j) == srcId) {
-        while (j < other.size && other.srcIdFromPos(j) == srcId && other.srcIdFromPos(j) < dstId) {
-          j += 1
-        }
-        if (j < other.size && other.srcIdFromPos(j) == srcId && other.dstIdFromPos(j) == dstId) {
-          // ... run `f` on the matching edge
-          builder.add(srcId, dstId, localSrcIds(i), localDstIds(i),
-            f(srcId, dstId, this.data(i), other.attrs(j)))
-        }
-      }
-      i += 1
-    }
-    builder.build
-  }
-
   def iterator: Iterator[Edge[ED]] = new Iterator[Edge[ED]] {
     private[this] var pos = 0
 

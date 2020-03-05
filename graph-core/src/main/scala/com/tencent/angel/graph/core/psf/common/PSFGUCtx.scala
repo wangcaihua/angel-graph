@@ -12,12 +12,12 @@ case class PSFGUCtx(psContext: PSContext, matrixId: Int, partitionId: Int,
                     private val tpe: Type, private val param: Any) {
   lazy val key: String = s"$matrixId-$partitionId"
 
-  def getParam[T: TypeTag]: T = {
-    assert(tpe =:= typeOf[T])
+  def getParam[T]: T = {
+    // assert(tpe =:= typeOf[T])
     param.asInstanceOf[T]
   }
 
-  def getMapParam[V: ClassTag: TypeTag]: FastHashMap[VertexId, V] = {
+  def getMapParam[V: ClassTag]: FastHashMap[VertexId, V] = {
     if (GUtils.isSerFastHashMap(tpe)) {
       param.asInstanceOf[FastHashMap[VertexId, V]]
     } else {

@@ -6,8 +6,6 @@ import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.utils.{FastHashMap, GUtils, ReflectUtils}
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.psagent.matrix.MatrixClient
-import it.unimi.dsi.fastutil.ints._
-import it.unimi.dsi.fastutil.longs._
 
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe._

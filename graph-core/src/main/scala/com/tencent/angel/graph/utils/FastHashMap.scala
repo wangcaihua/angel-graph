@@ -5,10 +5,9 @@ import com.tencent.angel.ml.math2.vector._
 import io.netty.buffer.ByteBuf
 
 import scala.reflect._
-import scala.reflect.runtime.universe._
 import scala.{specialized => spec}
 
-class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](expected: Int, private var f: Float)
+class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag](expected: Int, private var f: Float)
   extends GData with Serializable {
 
   import com.tencent.angel.graph.utils.HashCommon._
@@ -456,7 +455,7 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
     }
   }
 
-  def mapValues[U: ClassTag : TypeTag](func: V => U): FastHashMap[K, U] = {
+  def mapValues[U: ClassTag](func: V => U): FastHashMap[K, U] = {
     //val newKeys = new Array[K](keys.length)
     val newValues = new Array[U](keys.length)
 
@@ -756,15 +755,14 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
-            val value = ReflectUtils.newInstance(typeOf[V])
-              .asInstanceOf[GData]
+            val value = valueTag.newInstance().asInstanceOf[GData]
             value.deserialize(byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Vector].isAssignableFrom(vclz) =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readInt()
-            val value = SerDe.vectorFromBuffer(typeOf[V], byteBuf)
+            val value = SerDe.vectorFromBuffer(null, byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
@@ -885,15 +883,14 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag : TypeTag](exp
         case vclz if classOf[GData].isAssignableFrom(vclz) =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readLong()
-            val value = ReflectUtils.newInstance(typeOf[V])
-              .asInstanceOf[GData]
+            val value = valueTag.newInstance().asInstanceOf[GData]
             value.deserialize(byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Vector].isAssignableFrom(vclz) =>
           (0 until mapSize).foreach { _ =>
             val key = byteBuf.readLong()
-            val value = SerDe.vectorFromBuffer(typeOf[V], byteBuf)
+            val value = SerDe.vectorFromBuffer(null, byteBuf)
             put(key.asInstanceOf[K], value.asInstanceOf[V])
           }
         case vclz if classOf[Serializable].isAssignableFrom(vclz) =>
@@ -1001,7 +998,7 @@ object FastHashMap {
 
   import com.tencent.angel.graph.utils.HashCommon._
 
-  def fromUnimi[K: ClassTag, V: ClassTag : TypeTag](empty: Any): FastHashMap[K, V] = {
+  def fromUnimi[K: ClassTag, V: ClassTag](empty: Any): FastHashMap[K, V] = {
     val keys: Array[K] = getField[Array[K]](empty, "key")
     val values: Array[V] = getField[Array[V]](empty, "value")
     val containsNullKey: Boolean = getField[Boolean](empty, "containsNullKey")

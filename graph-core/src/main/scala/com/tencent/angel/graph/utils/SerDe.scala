@@ -1280,7 +1280,7 @@ object SerDe {
         val fast = new FastHashMap[Int, String]()
         fast.deserialize(byteBuf)
         fast
-      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Int]
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.head =:= typeOf[Int]
         && tp.typeArgs.last <:< typeOf[Vector] =>
         val fast = tp.typeArgs.last match {
           case vt if vt =:= typeOf[IntDummyVector] =>
@@ -1306,7 +1306,7 @@ object SerDe {
         }
         fast.deserialize(byteBuf)
         fast
-      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Int]
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.head =:= typeOf[Int]
         && (tp.typeArgs.last <:< typeOf[GData] || tp.typeArgs.last <:< typeOf[Serializable]) =>
         val fast = ReflectUtils.newFastHashMap(tp)
         fast.deserialize(byteBuf)
@@ -1379,7 +1379,7 @@ object SerDe {
         val fast = new FastHashMap[Long, String]()
         fast.deserialize(byteBuf)
         fast
-      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Long]
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.head =:= typeOf[Long]
         && tp.typeArgs.last <:< typeOf[Vector] =>
         val fast = tp.typeArgs.last match {
           case vt if vt =:= typeOf[IntDummyVector] =>
@@ -1405,7 +1405,7 @@ object SerDe {
         }
         fast.deserialize(byteBuf)
         fast
-      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.last =:= typeOf[Long]
+      case tp if GUtils.isSerFastHashMap(tp) && tp.typeArgs.head =:= typeOf[Long]
         && (tp.typeArgs.last <:< typeOf[GData] || tp.typeArgs.last <:< typeOf[Serializable]) =>
         val fast = ReflectUtils.newFastHashMap(tp)
         fast.deserialize(byteBuf)
@@ -1442,13 +1442,6 @@ object SerDe {
         val fast = new FastHashMap[Long, Array[Double]]()
         fast.deserialize(byteBuf)
         fast
-      case tp if GUtils.isSerFastHashMap(tp) =>
-        val vtpe = tp.typeArgs(1)
-        if (vtpe <:< typeOf[GData] || vtpe <:< typeOf[Serializable]) {
-          ReflectUtils.newFastHashMap(tp).deserialize(byteBuf)
-        } else {
-          throw new Exception(s"cannot deserilize ${tp.toString}")
-        }
       case tp if tp =:= typeOf[Int2BooleanOpenHashMap] =>
         val res = new Int2BooleanOpenHashMap(size)
         (0 until size).foreach { _ =>
@@ -2055,7 +2048,9 @@ object SerDe {
   }
 
   def vectorFromBuffer(tpe: Type, byteBuf: ByteBuf): Any = {
-    assert(tpe <:< typeOf[Vector])
+    if (tpe != null) {
+      assert(tpe <:< typeOf[Vector])
+    }
 
     val dim = byteBuf.readLong()
 
@@ -2254,10 +2249,7 @@ object SerDe {
 
   // 4. for object
   def serialize(obj: Any, fields: List[TermSymbol], byteBuf: ByteBuf): Unit = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
 
     fields.foreach { field =>
       field.typeSignature match {
@@ -2278,20 +2270,16 @@ object SerDe {
   }
 
   def serialize(obj: Any, byteBuf: ByteBuf): Unit = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
+
     val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
 
     serialize(inst, fields, byteBuf)
   }
 
   def deserialize(obj: Any, fields: List[TermSymbol], byteBuf: ByteBuf): Unit = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
+
 
     fields.foreach { field =>
       field.typeSignature match {
@@ -2318,20 +2306,16 @@ object SerDe {
   }
 
   def deserialize(obj: Any, byteBuf: ByteBuf): Unit = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
+
     val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
 
     deserialize(inst, fields, byteBuf)
   }
 
   def bufferLen(obj: Any, fields: List[TermSymbol]): Int = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
+
 
     var len = 0
 
@@ -2356,10 +2340,8 @@ object SerDe {
   }
 
   def bufferLen(obj: Any): Int = {
-    val inst = obj match {
-      case instMirror: InstanceMirror => instMirror
-      case _ => ReflectUtils.instMirror(obj)
-    }
+    val inst = if (!obj.isInstanceOf[InstanceMirror]) ReflectUtils.instMirror(obj) else obj.asInstanceOf[InstanceMirror]
+
     val fields = ReflectUtils.getFields(inst.symbol.typeSignature)
 
     bufferLen(inst, fields)

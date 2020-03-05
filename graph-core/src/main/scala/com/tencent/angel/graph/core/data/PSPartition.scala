@@ -6,7 +6,6 @@ import com.tencent.angel.graph.utils.{BitSet, FastHashMap, Logging, RefHashMap}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
 
 
 class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
@@ -24,6 +23,10 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
 
   private var sample1: SampleOne = new Simple(local2global)
   private var sampleK: SampleK = new Reservoir(local2global)
+
+  def withAttrType[VD2: ClassTag]: PSPartition[VD2] = {
+    new PSPartition[VD2](global2local, local2global)
+  }
 
   // attribution & message methods
   def getAttr(vid: VertexId): VD = attrs(global2local(vid))
@@ -90,7 +93,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   def activeVerticesCount(): Int = mask.capacity
 
   // slots operations
-  def createSlot[V: ClassTag : TypeTag](name: String): this.type = slotRefMap.synchronized {
+  def createSlot[V: ClassTag](name: String): this.type = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap
@@ -111,7 +114,7 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     this
   }
 
-  def getOrCreateSlot[V: ClassTag : TypeTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
+  def getOrCreateSlot[V: ClassTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
     if (!slotRefMap.contains(name)) {
       val refMap = new RefHashMap[V](global2local, local2global)
       slotRefMap(name) = refMap
@@ -176,6 +179,10 @@ object PSPartition {
     } else {
       throw new Exception(s"cannot find partition by key $key")
     }
+  }
+
+  def set[VD: ClassTag](key: String, psPartition: PSPartition[VD]): Unit = partitions.synchronized {
+    partitions.put(key, psPartition)
   }
 
   def contains(key: String): Boolean = {

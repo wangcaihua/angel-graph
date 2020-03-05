@@ -82,7 +82,8 @@ object GUtils {
     typeOf[VertexId] match {
       case t if t =:= typeOf[Int] =>
         val array = value match {
-          case v: FastHashMap[Int, _] => v.keyArray
+          case v: FastHashMap[_, _] if v.keyTag == classOf[Int] =>
+            v.asInstanceOf[FastHashMap[Int, _]].keyArray
           case v: Int2BooleanOpenHashMap => v.keySet().toIntArray
           case v: Int2CharOpenHashMap => v.keySet().toIntArray
           case v: Int2ByteOpenHashMap => v.keySet().toIntArray
@@ -98,7 +99,8 @@ object GUtils {
         array.asInstanceOf[Array[VertexId]]
       case t if t =:= typeOf[Long] =>
         val array = value match {
-          case v: FastHashMap[Long, _] => v.keyArray
+          case v: FastHashMap[_, _] if v.keyTag == classOf[Long] =>
+            v.asInstanceOf[FastHashMap[Long, _]].keyArray
           case v: Long2BooleanOpenHashMap => v.keySet().toLongArray
           case v: Long2CharOpenHashMap => v.keySet().toLongArray
           case v: Long2ByteOpenHashMap => v.keySet().toLongArray

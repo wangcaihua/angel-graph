@@ -96,12 +96,9 @@ object ReflectUtils {
 
   def field(obj: Any, field: TermSymbol): FieldMirror = {
     if (obj != null && field != null) {
-      val inst = obj match {
-        case inst: InstanceMirror => inst
-        case o: Any => mirror.reflect(o)
-      }
+      val instMirror = if (!obj.isInstanceOf[InstanceMirror]) mirror.reflect(obj) else obj.asInstanceOf[InstanceMirror]
 
-      inst.reflectField(field)
+      instMirror.reflectField(field)
     } else {
       throw new Exception("inst or field or value is null !")
     }
@@ -109,10 +106,7 @@ object ReflectUtils {
 
   def field(obj: Any, fieldName: String): FieldMirror = {
     if (obj != null) {
-      val instMirror = obj match {
-        case inst: InstanceMirror => inst
-        case o: Any => mirror.reflect(o)
-      }
+      val instMirror = if (!obj.isInstanceOf[InstanceMirror]) mirror.reflect(obj) else obj.asInstanceOf[InstanceMirror]
 
       val field = instMirror.symbol.typeSignature.member(TermName(fieldName)).asTerm
       instMirror.reflectField(field)
@@ -150,14 +144,11 @@ object ReflectUtils {
 
   def method(obj: Any, name: String, args: Type*): MethodMirror = {
     if (obj != null) {
-      val inst = obj match {
-        case inst: InstanceMirror => inst
-        case o: Any => mirror.reflect(o)
-      }
+      val instMirror = if (!obj.isInstanceOf[InstanceMirror]) mirror.reflect(obj) else obj.asInstanceOf[InstanceMirror]
 
-      val tpe = inst.symbol.typeSignature
+      val tpe = instMirror.symbol.typeSignature
       val m = getMethod(tpe, TermName(name), args: _*)
-      inst.reflectMethod(m)
+      instMirror.reflectMethod(m)
     } else {
       throw new Exception("inst is null!")
     }
