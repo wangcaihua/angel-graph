@@ -25,6 +25,9 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
 
   def this(edges: RDD[EdgePartition[VD, ED]]) = this(Graph.createPSVertices(edges), edges)
 
+  edges.cache()
+  edges.foreachPartition { iter => iter.next().setPSMatrix(psVertices) }
+
   @transient private lazy val sparkContext: SparkContext = edges.sparkContext
   @transient private lazy val matrixMetaManager: PSAgentMatrixMetaManager = PSAgentContext.get.getMatrixMetaManager
 
@@ -38,34 +41,50 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
     Iterator.single(part.minVertexId)
   }.min()
 
+  @transient lazy val numVertices: Long = {
+    val getNumVertices = psVertices.createGet { ctx: PSFGUCtx =>
+      ctx.getPartition[VD].global2local.size().toLong
+    } { ctx: PSFMCtx =>
+      ctx.getLast[Long] + ctx.getCurr[Long]
+    }
+
+    val num = getNumVertices()
+    getNumVertices.clear()
+    num
+  }
+
+  @transient lazy val numEdges: Long = {
+    edges.mapPartitions { iter => Iterator.single(iter.next().size.toLong) }.collect().sum
+  }
+
   @transient lazy val numPsPartition: Int = matrixMetaManager.getPartitions(psVertices.id).size()
 
   @transient lazy val vertices: RDD[NodePartition[VD]] = sparkContext
     .parallelize(0 until numPsPartition, numPsPartition).mapPartitions { iter =>
-      val partId = iter.next()
+    val partId = iter.next()
 
-      val pullAttr = psVertices.createGet { ctx: PSFGUCtx =>
-        val pid = ctx.getParam[Singular]
-        assert(pid.partition == ctx.partitionId)
+    val pullAttr = psVertices.createGet { ctx: PSFGUCtx =>
+      val pid = ctx.getParam[Singular]
+      assert(pid.partition == ctx.partitionId)
 
-        val partition = ctx.getPartition[VD]
+      val partition = ctx.getPartition[VD]
 
-        val result = new FastHashMap[VertexId, VD](partition.local2global.length)
-        partition.local2global.foreach { vid => result(vid) = partition.getAttr(vid) }
-        result
-      } { ctx: PSFMCtx =>
-        val last = ctx.getLast[FastHashMap[VertexId, VD]]
-        val curr = ctx.getCurr[FastHashMap[VertexId, VD]]
+      val result = new FastHashMap[VertexId, VD](partition.local2global.length)
+      partition.local2global.foreach { vid => result(vid) = partition.getAttr(vid) }
+      result
+    } { ctx: PSFMCtx =>
+      val last = ctx.getLast[FastHashMap[VertexId, VD]]
+      val curr = ctx.getCurr[FastHashMap[VertexId, VD]]
 
-        last.merge(curr)
-      }
-
-      val attrs = pullAttr(Singular(partId))
-      pullAttr.clear()
-
-      val nodePartition = new NodePartition[VD](attrs)
-      Iterator.single(nodePartition)
+      last.merge(curr)
     }
+
+    val attrs = pullAttr(Singular(partId))
+    pullAttr.clear()
+
+    val nodePartition = new NodePartition[VD](attrs)
+    Iterator.single(nodePartition)
+  }
 
   private[graph] def withEdges(newEdges: RDD[EdgePartition[VD, ED]]): Graph[VD, ED] = new Graph(psVertices, newEdges)
 
@@ -352,10 +371,8 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
         val partition = ctx.getPartition[VD]
         val degree = partition.getOrCreateSlot[Int](slotName)
 
-        def mergeF(v1: Int, v2: Int): Int = v1 + v2
-
         params.foreach { case (k, v) =>
-          degree.putMerge(k, v, mergeF)
+          degree.putMerge(k, v, (v1: Int, v2: Int) => v1 + v2)
         }
       }
 
@@ -542,6 +559,16 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
 
     newEdges.cache()
     withEdges(newEdges)
+  }
+
+  def updateVertexAttrInEdge(batchSize: Int = -1): this.type = {
+    edges.foreachPartition { iter =>
+      val edgePartition = iter.next()
+      edgePartition.setPSMatrix(psVertices)
+      edgePartition.updateVertexAttrs(batchSize)
+    }
+
+    this
   }
 
   private[graph] def aggregateMessagesWithActiveSet[M: ClassTag : TypeTag](sendMsg: EdgeContext[VD, ED, M] => Unit,

@@ -7,7 +7,7 @@ import com.tencent.angel.graph.core.psf.get.GetPSF
 import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
 import com.tencent.angel.graph.utils.psfConverters._
-import com.tencent.angel.graph.utils.{BitSet, FastArray, FastHashMap, Logging, RefHashMap}
+import com.tencent.angel.graph.utils.{BitSet, FastArray, FastHashMap, Logging}
 import com.tencent.angel.graph.{VertexId, VertexSet}
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.models.PSMatrix
@@ -149,7 +149,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
 
   def attrs(pos: Int): ED = data(pos)
 
-  def updateEdgeAttrsByPos(pos: Int, attr: ED) : this.type = {
+  def updateEdgeAttrsByPos(pos: Int, attr: ED): this.type = {
     data(pos) = attr
     this
   }
@@ -332,7 +332,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
     assert(psMatrix != null)
 
     // 1. create PSFs
-    val updateRemoteVertexMsg: UpdatePSF = psMatrix.createUpdate { ctx: PSFGUCtx =>
+    val updateRemoteVertexMsg = psMatrix.createUpdate { ctx: PSFGUCtx =>
       val param = ctx.getMapParam[M]
       val partition = ctx.getPartition[VD]
 

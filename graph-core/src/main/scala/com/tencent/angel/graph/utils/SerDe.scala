@@ -388,8 +388,6 @@ object SerDe {
                     serArr(s.asInstanceOf[Array[Float]], byteBuf)
                   case _: Double =>
                     serArr(s.asInstanceOf[Array[Double]], byteBuf)
-                  case _: String =>
-                    serArr(s.asInstanceOf[Array[String]], byteBuf)
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
@@ -488,8 +486,6 @@ object SerDe {
                     serArr(s.asInstanceOf[Array[Float]], byteBuf)
                   case _: Double =>
                     serArr(s.asInstanceOf[Array[Double]], byteBuf)
-                  case _: String =>
-                    serArr(s.asInstanceOf[Array[String]], byteBuf)
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
@@ -518,7 +514,7 @@ object SerDe {
       map match {
         case fast: FastHashMap[_, _] =>
           len = fast.bufferLen()
-        case i2bo: Int2BooleanArrayMap =>
+        case i2bo: Int2BooleanOpenHashMap =>
           len += (4 + boolSize) * i2bo.size()
         case i2by: Int2ByteOpenHashMap =>
           len += 5 * i2by.size()
@@ -559,8 +555,6 @@ object SerDe {
                     len += serArrBufSize(s.asInstanceOf[Array[Float]])
                   case _: Double =>
                     len += serArrBufSize(s.asInstanceOf[Array[Double]])
-                  case _: String =>
-                    len += serArrBufSize(s.asInstanceOf[Array[String]])
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
@@ -615,8 +609,6 @@ object SerDe {
                     len += serArrBufSize(s.asInstanceOf[Array[Float]])
                   case _: Double =>
                     len += serArrBufSize(s.asInstanceOf[Array[Double]])
-                  case _: String =>
-                    len += serArrBufSize(s.asInstanceOf[Array[String]])
                   case _ =>
                     throw new Exception("cannot serialize value object!")
                 }
@@ -797,8 +789,6 @@ object SerDe {
                         serArr(s.asInstanceOf[Array[Float]], byteBuf)
                       case _: Double =>
                         serArr(s.asInstanceOf[Array[Double]], byteBuf)
-                      case _: String =>
-                        serArr(s.asInstanceOf[Array[String]], byteBuf)
                       case _: Serialize =>
                         serArr(s.asInstanceOf[Array[Serialize]], byteBuf)
                       case _ =>
@@ -973,8 +963,6 @@ object SerDe {
                         serArr(s.asInstanceOf[Array[Float]], byteBuf)
                       case _: Double =>
                         serArr(s.asInstanceOf[Array[Double]], byteBuf)
-                      case _: String =>
-                        serArr(s.asInstanceOf[Array[String]], byteBuf)
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
@@ -1097,8 +1085,6 @@ object SerDe {
                         len += serArrBufSize(s.asInstanceOf[Array[Float]])
                       case _: Double =>
                         len += serArrBufSize(s.asInstanceOf[Array[Double]])
-                      case _: String =>
-                        len += serArrBufSize(s.asInstanceOf[Array[String]])
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
@@ -1208,8 +1194,6 @@ object SerDe {
                         len += serArrBufSize(s.asInstanceOf[Array[Float]])
                       case _: Double =>
                         len += serArrBufSize(s.asInstanceOf[Array[Double]])
-                      case _: String =>
-                        len += serArrBufSize(s.asInstanceOf[Array[String]])
                       case _ =>
                         throw new Exception("cannot serialize value object!")
                     }
@@ -1303,6 +1287,8 @@ object SerDe {
             new FastHashMap[Int, LongFloatVector]()
           case vt if vt =:= typeOf[LongDoubleVector] =>
             new FastHashMap[Int, LongDoubleVector]()
+          case vt if vt <:< typeOf[Vector] =>
+            new FastHashMap[Int, Vector]()
         }
         fast.deserialize(byteBuf)
         fast
@@ -1402,6 +1388,8 @@ object SerDe {
             new FastHashMap[Long, LongFloatVector]()
           case vt if vt =:= typeOf[LongDoubleVector] =>
             new FastHashMap[Long, LongDoubleVector]()
+          case vt if vt <:< typeOf[Vector] =>
+            new FastHashMap[Long, Vector]()
         }
         fast.deserialize(byteBuf)
         fast

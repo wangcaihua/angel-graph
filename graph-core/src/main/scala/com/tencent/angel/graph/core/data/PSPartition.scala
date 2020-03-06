@@ -21,8 +21,8 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   private lazy val message: Array[Any] = new Array[Any](global2local.size())
   private lazy val slotRefMap = new mutable.HashMap[String, RefHashMap[_]]()
 
-  private var sample1: SampleOne = new Simple(local2global)
-  private var sampleK: SampleK = new Reservoir(local2global)
+  @transient private var sample1: SampleOne = new Simple(local2global)
+  @transient private var sampleK: SampleK = new Reservoir(local2global)
 
   def withAttrType[VD2: ClassTag]: PSPartition[VD2] = {
     new PSPartition[VD2](global2local, local2global)
