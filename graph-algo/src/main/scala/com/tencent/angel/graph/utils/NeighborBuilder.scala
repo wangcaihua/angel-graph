@@ -1,9 +1,9 @@
 package com.tencent.angel.graph.utils
 
-import com.tencent.angel.graph.{VertexId, VertexType, WgtTpe}
-import com.tencent.angel.graph.core.data.{NeighN, NeighNW, NeighTN, NeighTNW, Neighbor}
+import com.tencent.angel.graph.core.data._
 import com.tencent.angel.graph.framework.EdgeDirection
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
+import com.tencent.angel.graph.{VertexId, VertexType, WgtTpe}
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap
 
 import scala.reflect.ClassTag
@@ -88,7 +88,7 @@ class UnTypedNeighborBuilder {
   }
 }
 
-class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
+class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag : TypeTag]
 (direction: EdgeDirection, private val neighTable: FastHashMap[VertexId, UnTypedNeighborBuilder]) {
   def this(direction: EdgeDirection) = {
     this(direction, new FastHashMap[VertexId, UnTypedNeighborBuilder]())
@@ -177,8 +177,11 @@ class PartitionUnTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
   def build: FastHashMap[VertexId, N] = {
     neighTable.mapValues[N](value => value.build[N])
   }
-}
 
+  def build(fast: FastHashMap[VertexId, N]): Unit = {
+    neighTable.foreach { case (key, value) => fast(key) = value.build[N] }
+  }
+}
 
 
 class TypedNeighborBuilder {
@@ -346,7 +349,7 @@ class TypedNeighborBuilder {
   }
 }
 
-class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
+class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag : TypeTag]
 (direction: EdgeDirection, private val neighTable: FastHashMap[VertexId, TypedNeighborBuilder]) {
   def this(direction: EdgeDirection) = {
     this(direction, new FastHashMap[VertexId, TypedNeighborBuilder]())
@@ -442,5 +445,9 @@ class PartitionTypedNeighborBuilder[N <: Neighbor : ClassTag: TypeTag]
 
   def build: FastHashMap[VertexId, N] = {
     neighTable.mapValues[N](value => value.build[N])
+  }
+
+  def build(fast: FastHashMap[VertexId, N]): Unit = {
+    neighTable.foreach { case (key, value) => fast(key) = value.build[N] }
   }
 }

@@ -2,18 +2,20 @@ package com.tencent.angel.graph.framework
 
 import java.util.concurrent.Future
 
+import com.tencent.angel.graph.core.data._
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx}
 import com.tencent.angel.graph.core.psf.get.GetPSF
-import com.tencent.angel.graph.core.psf.update.UpdatePSF
 import com.tencent.angel.graph.framework.EdgeActiveness.EdgeActiveness
+import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
+import com.tencent.angel.graph.utils._
 import com.tencent.angel.graph.utils.psfConverters._
-import com.tencent.angel.graph.utils.{BitSet, FastArray, FastHashMap, Logging}
-import com.tencent.angel.graph.{VertexId, VertexSet}
+import com.tencent.angel.graph.{VertexId, VertexSet, WgtTpe, _}
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.spark.models.PSMatrix
 
+import scala.collection.mutable
 import scala.reflect._
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe._
 import scala.{specialized => spec}
 
 class EdgePartition[VD: ClassTag : TypeTag,
@@ -34,6 +36,16 @@ class EdgePartition[VD: ClassTag : TypeTag,
   lazy val maxVertexId: VertexId = local2global.max
 
   lazy val minVertexId: VertexId = local2global.min
+
+  private lazy val slotRefMap = new mutable.HashMap[String, RefHashMap[_]]()
+
+  private lazy val trainData = new FastArray[VertexId]()
+
+  private lazy val trainLabels = new FastArray[Float]()
+
+  private lazy val testData = new FastArray[VertexId]()
+
+  private lazy val testLabels = new FastArray[Float]()
 
   private var psMatrix: PSMatrix = _
 
@@ -430,6 +442,158 @@ class EdgePartition[VD: ClassTag : TypeTag,
     }
 
     updateRemoteVertexMsg.clear()
+  }
+
+  // slots operations
+  def createSlot[V: ClassTag](name: String): this.type = slotRefMap.synchronized {
+    if (!slotRefMap.contains(name)) {
+      val refMap = new RefHashMap[V](global2local, local2global)
+      slotRefMap(name) = refMap
+    } else {
+      throw new Exception(s"slot $name already exists!")
+    }
+
+    this
+  }
+
+  def setSlot[V: ClassTag](name: String, refMap: RefHashMap[V]): this.type = slotRefMap.synchronized {
+    if (!slotRefMap.contains(name)) {
+      slotRefMap(name) = refMap
+    } else {
+      throw new Exception(s"slot $name already exists!")
+    }
+
+    this
+  }
+
+  def getOrCreateSlot[V: ClassTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
+    if (!slotRefMap.contains(name)) {
+      val refMap = new RefHashMap[V](global2local, local2global)
+      slotRefMap(name) = refMap
+      refMap
+    } else {
+      slotRefMap(name).asInstanceOf[RefHashMap[V]]
+    }
+  }
+
+  def removeSlot(name: String): this.type = slotRefMap.synchronized {
+    if (slotRefMap.contains(name)) {
+      slotRefMap.remove(name)
+    }
+    this
+  }
+
+  def getSlot[V: ClassTag](name: String): RefHashMap[V] = slotRefMap.synchronized {
+    if (slotRefMap.contains(name)) {
+      slotRefMap(name).asInstanceOf[RefHashMap[V]]
+    } else {
+      println(s"slot $name is not exists!")
+      null.asInstanceOf[RefHashMap[V]]
+    }
+  }
+
+  def adjacency[N <: Neighbor : ClassTag : TypeTag](direction: EdgeDirection): this.type = {
+    val neighs = getOrCreateSlot[N]("neighbors")
+
+    var pos = 0
+    typeOf[N] match {
+      case nt if nt =:= typeOf[NeighN] =>
+        val adjBuilder = new PartitionUnTypedNeighborBuilder[N](direction)
+        while (pos < size) {
+          adjBuilder.add(srcIdFromPos(pos), dstIdFromPos(pos))
+          pos += 1
+        }
+        adjBuilder.build(neighs)
+      case nt if nt =:= typeOf[NeighNW] =>
+        val adjBuilder = new PartitionUnTypedNeighborBuilder[N](direction)
+        while (pos < size) {
+          adjBuilder.add(srcIdFromPos(pos), dstIdFromPos(pos), attrs(pos).asInstanceOf[WgtTpe])
+          pos += 1
+        }
+        adjBuilder.build(neighs)
+      case nt if nt =:= typeOf[NeighTN] =>
+        val adjBuilder = new PartitionTypedNeighborBuilder[N](direction)
+        while (pos < size) {
+          val srcId = srcIdFromPos(pos)
+          val dstId = dstIdFromPos(pos)
+          val attr = attrs(pos).asInstanceOf[Long]
+          val srcType = attr.srcType
+          val dstType = attr.dstType
+          adjBuilder.add(srcId, srcType, dstId, dstType)
+          pos += 1
+        }
+        adjBuilder.build(neighs)
+      case nt if nt =:= typeOf[NeighTNW] =>
+        val adjBuilder = new PartitionTypedNeighborBuilder[N](direction)
+        while (pos < size) {
+          val srcId = srcIdFromPos(pos)
+          val dstId = dstIdFromPos(pos)
+          val attr = attrs(pos).asInstanceOf[Long]
+          val srcType = attr.srcType
+          val dstType = attr.dstType
+          val weight = attr.weight
+          adjBuilder.add(srcId, srcType, dstId, dstType, weight)
+          pos += 1
+        }
+        adjBuilder.build(neighs)
+      case _ =>
+        throw new Exception("Adjacency data error!")
+    }
+
+    this
+  }
+
+  def addTrainingData(vid: VertexId, label: Float): this.type = {
+    trainData += vid
+    trainLabels += label
+
+    this
+  }
+
+  def addTestData(vid: VertexId, label: Float): this.type = {
+    testData += vid
+    testLabels += label
+
+    this
+  }
+
+  def splitTrainingData(ratio: Double = 0.8): this.type = {
+    val start = (trainLabels.size * 0.8).toInt
+    val end = trainLabels.size
+
+    assert(start < end)
+    (start until end).foreach { idx =>
+      testData += trainData(idx)
+      testLabels += trainLabels(idx)
+    }
+
+    trainData.resize(start)
+    testLabels.resize(start)
+
+    testData.trim()
+    testLabels.trim()
+    this
+  }
+
+  def trim(): this.type = {
+    val clz = this.getClass
+
+    val fields = List(
+      clz.getDeclaredField("localSrcIds"),
+      clz.getDeclaredField("localDstIds"),
+      clz.getDeclaredField("data"),
+      clz.getDeclaredField("index"),
+      clz.getDeclaredField("vertexAttrs"),
+      clz.getDeclaredField("localDegreeHist"),
+      clz.getDeclaredField("activeSet")
+    )
+
+    fields.foreach { field =>
+      field.setAccessible(true)
+      field.set(this, null)
+    }
+
+    this
   }
 }
 
