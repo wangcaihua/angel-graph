@@ -257,6 +257,22 @@ object ReflectUtils {
             case "NeighNW" => typeOf[Array[NeighNW]]
             case "NeighTN" => typeOf[Array[NeighTN]]
             case "NeighTNW" => typeOf[Array[NeighTNW]]
+            case "Int2IntOpenHashMap" => typeOf[Array[Int2IntOpenHashMap]]
+            case "Int2LongOpenHashMap" => typeOf[Array[Int2LongOpenHashMap]]
+            case "Int2FloatOpenHashMap" => typeOf[Array[Int2FloatOpenHashMap]]
+            case "Int2DoubleOpenHashMap" => typeOf[Array[Int2DoubleOpenHashMap]]
+            case "Int2ByteOpenHashMap" => typeOf[Array[Int2ByteOpenHashMap]]
+            case "Int2BooleanOpenHashMap" => typeOf[Array[Int2BooleanOpenHashMap]]
+            case "Int2ShortOpenHashMap" => typeOf[Array[Int2ShortOpenHashMap]]
+            case "Int2CharOpenHashMap" => typeOf[Array[Int2CharOpenHashMap]]
+            case "Long2IntOpenHashMap" => typeOf[Array[Long2IntOpenHashMap]]
+            case "Long2LongOpenHashMap" => typeOf[Array[Long2LongOpenHashMap]]
+            case "Long2FloatOpenHashMap" => typeOf[Array[Long2FloatOpenHashMap]]
+            case "Long2DoubleOpenHashMap" => typeOf[Array[Long2DoubleOpenHashMap]]
+            case "Long2ByteOpenHashMap" => typeOf[Array[Long2ByteOpenHashMap]]
+            case "Long2BooleanOpenHashMap" => typeOf[Array[Long2BooleanOpenHashMap]]
+            case "Long2ShortOpenHashMap" => typeOf[Array[Long2ShortOpenHashMap]]
+            case "Long2CharOpenHashMap" => typeOf[Array[Long2CharOpenHashMap]]
           }
         case FastMap(fm, k, v) if fm.split("\\.").last.equalsIgnoreCase("FastHashMap") =>
           val key = k.split("\\.").last

@@ -154,6 +154,8 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
     sampleK = sk
     this
   }
+
+  def checkpoint(): Unit = ???
 }
 
 object PSPartition {

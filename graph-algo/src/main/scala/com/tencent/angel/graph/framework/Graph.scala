@@ -453,6 +453,18 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
     aggregateMessagesWithActiveSet(sendMsg, mergeMsg, tripletFields, activeness = EdgeActiveness.Both)
   }
 
+  def checkpoint(): Unit = {
+    val psCheckpoint = psVertices.createUpdate { ctx: PSFGUCtx =>
+      ctx.getPartition[VD].checkpoint()
+    }
+
+    psCheckpoint()
+
+    psCheckpoint.clear()
+
+    edges.checkpoint()
+  }
+
 }
 
 object Graph extends Logging {
@@ -529,4 +541,4 @@ object Graph extends Logging {
 
     psMatrix
   }
-  }
+}
