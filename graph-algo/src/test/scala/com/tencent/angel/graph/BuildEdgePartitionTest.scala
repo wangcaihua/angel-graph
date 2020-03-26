@@ -1,7 +1,7 @@
 package com.tencent.angel.graph
 
 
-import com.tencent.angel.graph.framework.{Edge, EdgeDirection, EdgePartitionBuilder}
+import com.tencent.angel.graph.framework.{Edge, EdgeDirection, StandardEdgePartitionBuilder}
 import com.tencent.angel.utils.WithSpark
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -14,7 +14,7 @@ class BuildEdgePartitionTest extends WithSpark {
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    data = sc.textFile("data/cora/cora.cites")
+    data = sc.textFile("../data/cora/cora.cites")
       .map { line =>
         val arr = line.split("\t").map(_.toLong)
         Edge(arr(0), arr(1), 1)
@@ -31,7 +31,7 @@ class BuildEdgePartitionTest extends WithSpark {
 
   test("in") {
     val edges = data.mapPartitions { iter =>
-      val builder = new EdgePartitionBuilder[Int, Int](128, EdgeDirection.In)
+      val builder = new StandardEdgePartitionBuilder[Int, Int](128, EdgeDirection.In)
       iter.foreach { edge => builder.add(edge) }
       Iterator.single(builder.build)
     }
@@ -41,12 +41,12 @@ class BuildEdgePartitionTest extends WithSpark {
       part.iterator
     }
 
-    reorderEdges.saveAsTextFile("orderedIn")
+    reorderEdges.saveAsTextFile("/tmp/orderedIn")
   }
 
   test("out") {
     val edges = data.mapPartitions { iter =>
-      val builder = new EdgePartitionBuilder[Int, Int](128, EdgeDirection.Out)
+      val builder = new StandardEdgePartitionBuilder[Int, Int](128, EdgeDirection.Out)
       iter.foreach { edge => builder.add(edge) }
       Iterator.single(builder.build)
     }
@@ -56,12 +56,12 @@ class BuildEdgePartitionTest extends WithSpark {
       part.iterator
     }
 
-    reorderEdges.saveAsTextFile("orderedOut")
+    reorderEdges.saveAsTextFile("/tmp/orderedOut")
   }
 
   test("both") {
     val edges = data.mapPartitions { iter =>
-      val builder = new EdgePartitionBuilder[Int, Int](128, EdgeDirection.Both)
+      val builder = new StandardEdgePartitionBuilder[Int, Int](128, EdgeDirection.Both)
       iter.foreach { edge => builder.add(edge) }
       Iterator.single(builder.build)
     }
@@ -71,6 +71,6 @@ class BuildEdgePartitionTest extends WithSpark {
       part.iterator
     }
 
-    reorderEdges.saveAsTextFile("orderedBoth")
+    reorderEdges.saveAsTextFile("/tmp/orderedBoth")
   }
 }

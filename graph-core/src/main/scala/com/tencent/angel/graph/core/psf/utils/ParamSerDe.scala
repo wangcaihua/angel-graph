@@ -3,14 +3,15 @@ package com.tencent.angel.graph.core.psf.utils
 import com.tencent.angel.common.Serialize
 import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Splitter}
-import com.tencent.angel.graph.utils.{GUtils, ReflectUtils, SerDe}
+import com.tencent.angel.graph.utils.{GUtils, Logging, ReflectUtils, SerDe}
 import io.netty.buffer.ByteBuf
 
 import scala.reflect.runtime.universe._
 
-object ParamSerDe {
+object ParamSerDe extends Logging {
 
   def serializeSplit(splitter: Splitter, tpe: Type, params: Any, buf: ByteBuf): Unit = {
+    logInfo(s"serializeSplit splitter, type ${tpe.toString}")
     SerDe.serPrimitive(tpe.toString, buf)
 
     splitter match {
@@ -42,6 +43,7 @@ object ParamSerDe {
   def deserializeSplit(buf: ByteBuf): (Type, Any) = {
     val tpe = ReflectUtils.typeFromString(
       SerDe.primitiveFromBuffer[String](buf))
+    logInfo(s"deserializeSplit splitter, type ${tpe.toString}")
 
     val params = if (GUtils.isPrimitive(tpe)) {
       SerDe.primitiveFromBuffer(tpe, buf)

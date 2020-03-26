@@ -29,7 +29,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
                                               val localDegreeHist: Array[Int],
                                               val activeSet: Option[VertexSet]) extends Serializable with Logging {
 
-  val size: Int = localSrcIds.length
+  var size: Int = if (localSrcIds != null) localSrcIds.length else -1
 
   private val maxTruck: Int = 10000
 
@@ -53,7 +53,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
     val param = ctx.getArrayParam
     val partition = ctx.getPartition[VD]
 
-    param.filter(vid => partition.isActive(global2local(vid)))
+    param.filter(vid => partition.isActive(partition.global2local(vid)))
   } { ctx: PSFMCtx =>
     val last = ctx.getLast[Array[VertexId]]
     val curr = ctx.getCurr[Array[VertexId]]
@@ -107,6 +107,37 @@ class EdgePartition[VD: ClassTag : TypeTag,
     this
   }
 
+  def updateSlot[S: ClassTag: TypeTag](name: String, batchSize: Int = -1): this.type = {
+    val pullNodeSlot: GetPSF[FastHashMap[VertexId, S]] = psMatrix.createGet { ctx: PSFGUCtx =>
+      val param = ctx.getArrayParam
+      val partition = ctx.getPartition[VD]
+
+      val slot = partition.getOrCreateSlot[S](name)
+      val map = new FastHashMap[VertexId, S](param.length)
+      param.foreach { vid => map(vid) = slot(vid) }
+      map
+    } { ctx: PSFMCtx =>
+      val last = ctx.getLast[FastHashMap[VertexId, S]]
+      val curr = ctx.getCurr[FastHashMap[VertexId, S]]
+
+      curr.foreach { case (vid, attr) => last(vid) = attr }
+      last
+    }
+
+    val pulledSlot = if (batchSize > 0) {
+      pullNodeSlot(local2global, batchSize)
+    } else {
+      pullNodeSlot(local2global, maxTruck)
+    }
+
+    val localSlot = getOrCreateSlot[S](name)
+    pulledSlot.foreach { case (key, value) =>
+      localSlot(key) = value
+    }
+
+    this
+  }
+
   def updateActiveSet(batchSize: Int = -1): this.type = {
     activeSet match {
       case Some(as) =>
@@ -133,11 +164,15 @@ class EdgePartition[VD: ClassTag : TypeTag,
 
   def indexSize: Int = index.size()
 
+  def contains(vid: VertexId): Boolean = global2local.containsKey(vid)
+
   @inline def srcIdFromPos(pos: Int): VertexId = local2global(localSrcIds(pos))
 
   @inline def dstIdFromPos(pos: Int): VertexId = local2global(localDstIds(pos))
 
   @inline def vertexAttrFromId(VerId: VertexId): VD = vertexAttrs(global2local(VerId))
+
+  @inline def setVertexAttrFromId(VerId: VertexId, vd: VD): Unit = vertexAttrs(global2local(VerId)) = vd
 
   @inline def edgeFromPos(pos: Int): Edge[ED] = {
     Edge(srcIdFromPos(pos), dstIdFromPos(pos), data(pos))
@@ -243,7 +278,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
 
   def filter(epred: EdgeTriplet[VD, ED] => Boolean,
              vpred: (VertexId, VD) => Boolean): EdgePartition[VD, ED] = {
-    val builder = new EdgePartitionBuilder[VD, ED]()
+    val builder = new StandardEdgePartitionBuilder[VD, ED]()
     var pos = 0
     while (pos < size) {
       // The user sees the EdgeTriplet, so we can't reuse it and must create one per edge.
@@ -498,21 +533,21 @@ class EdgePartition[VD: ClassTag : TypeTag,
     var pos = 0
     typeOf[N] match {
       case nt if nt =:= typeOf[NeighN] =>
-        val adjBuilder = new PartitionUnTypedNeighborBuilder[N](direction)
+        val adjBuilder = new PartitionUnTypedNeighborBuilder[NeighN](direction)
         while (pos < size) {
           adjBuilder.add(srcIdFromPos(pos), dstIdFromPos(pos))
           pos += 1
         }
-        adjBuilder.build(neighs)
+        adjBuilder.build(neighs.asInstanceOf[RefHashMap[NeighN]])
       case nt if nt =:= typeOf[NeighNW] =>
-        val adjBuilder = new PartitionUnTypedNeighborBuilder[N](direction)
+        val adjBuilder = new PartitionUnTypedNeighborBuilder[NeighNW](direction)
         while (pos < size) {
           adjBuilder.add(srcIdFromPos(pos), dstIdFromPos(pos), attrs(pos).asInstanceOf[WgtTpe])
           pos += 1
         }
-        adjBuilder.build(neighs)
+        adjBuilder.build(neighs.asInstanceOf[RefHashMap[NeighNW]])
       case nt if nt =:= typeOf[NeighTN] =>
-        val adjBuilder = new PartitionTypedNeighborBuilder[N](direction)
+        val adjBuilder = new PartitionTypedNeighborBuilder[NeighTN](direction)
         while (pos < size) {
           val srcId = srcIdFromPos(pos)
           val dstId = dstIdFromPos(pos)
@@ -522,9 +557,9 @@ class EdgePartition[VD: ClassTag : TypeTag,
           adjBuilder.add(srcId, srcType, dstId, dstType)
           pos += 1
         }
-        adjBuilder.build(neighs)
+        adjBuilder.build(neighs.asInstanceOf[RefHashMap[NeighTN]])
       case nt if nt =:= typeOf[NeighTNW] =>
-        val adjBuilder = new PartitionTypedNeighborBuilder[N](direction)
+        val adjBuilder = new PartitionTypedNeighborBuilder[NeighTNW](direction)
         while (pos < size) {
           val srcId = srcIdFromPos(pos)
           val dstId = dstIdFromPos(pos)
@@ -535,7 +570,7 @@ class EdgePartition[VD: ClassTag : TypeTag,
           adjBuilder.add(srcId, srcType, dstId, dstType, weight)
           pos += 1
         }
-        adjBuilder.build(neighs)
+        adjBuilder.build(neighs.asInstanceOf[RefHashMap[NeighTNW]])
       case _ =>
         throw new Exception("Adjacency data error!")
     }

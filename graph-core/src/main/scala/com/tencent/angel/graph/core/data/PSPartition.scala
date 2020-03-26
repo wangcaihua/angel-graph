@@ -24,6 +24,8 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
   @transient private var sample1: SampleOne = new Simple(local2global)
   @transient private var sampleK: SampleK = new Reservoir(local2global)
 
+  private lazy val cache = new mutable.HashMap[String, Any]()
+
   def withAttrType[VD2: ClassTag]: PSPartition[VD2] = {
     new PSPartition[VD2](global2local, local2global)
   }
@@ -138,6 +140,18 @@ class PSPartition[VD: ClassTag](val global2local: FastHashMap[VertexId, Int],
       println(s"slot $name is not exists!")
       null.asInstanceOf[RefHashMap[V]]
     }
+  }
+
+  // cache
+  def getCache[T](key: String): T = cache.synchronized {
+    cache.get(key) match {
+      case Some(data: Any) => data.asInstanceOf[T]
+      case None => null.asInstanceOf[T]
+    }
+  }
+
+  def putCache(key: String, value: Any): Unit = cache.synchronized {
+    cache.put(key, value)
   }
 
   // sample methods

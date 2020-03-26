@@ -1,16 +1,24 @@
 package com.tencent.angel.graph.framework
 
+import com.tencent.angel.graph.core.data._
 import com.tencent.angel.graph.framework.EdgeDirection.EdgeDirection
-import com.tencent.angel.graph.utils.{FastArray, FastHashMap, Logging, SortDataFormat, Sorter}
-import com.tencent.angel.graph.{VertexId, VertexSet}
+import com.tencent.angel.graph.utils._
+import com.tencent.angel.graph.{TypedEdgeAttribute, VertexId, VertexSet, WgtTpe}
 
 import scala.reflect._
+import scala.reflect.runtime.universe.{TypeTag, typeOf}
 import scala.{specialized => spec}
-import scala.reflect.runtime.universe.TypeTag
 
-class EdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Int, Long, Float, Double) ED: ClassTag]
+class StandardEdgePartitionBuilder[VD: ClassTag : TypeTag, @spec(Int, Long, Float, Double) ED: ClassTag]
 (size: Int = 64, edgeDirection: EdgeDirection = EdgeDirection.Out) extends Logging {
-  private val edges = new FastArray[Edge[ED]](size)
+  protected val edges = new FastArray[Edge[ED]](size)
+
+  protected lazy val defaultED: ED = implicitly[ClassTag[ED]].runtimeClass match {
+    case clz if clz == classOf[Int] => 1.asInstanceOf[ED]
+    case clz if clz == classOf[Long] => 1L.asInstanceOf[ED]
+    case clz if clz == classOf[Float] => 1.0f.asInstanceOf[ED]
+    case clz if clz == classOf[Double] => 1.0.asInstanceOf[ED]
+  }
 
   def add(srcId: VertexId, dstId: VertexId, attr: ED): this.type = {
     if (srcId != dstId) {
@@ -22,14 +30,14 @@ class EdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Int, Long, Float, Double
 
   def add(srcId: VertexId, dstId: VertexId): this.type = {
     if (srcId != dstId) {
-      edges += Edge(srcId, dstId, 1.asInstanceOf[ED])
+      edges += Edge(srcId, dstId, defaultED)
     }
 
     this
   }
 
   def add(edge: Edge[ED]): this.type = {
-    if (edge.dstId == edge.dstId) {
+    if (edge.srcId != edge.dstId) {
       edges += edge
     }
 
@@ -157,7 +165,231 @@ class EdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Int, Long, Float, Double
   }
 }
 
-class ExistingEdgePartitionBuilder[VD: ClassTag: TypeTag, @spec(Long, Int, Float, Double) ED: ClassTag]
+class EdgePartitionWithNeighborAttrBuilder[VD <: UnTyped : ClassTag : TypeTag]
+(size: Int = 64, hasEdges: Boolean, edgeDirection: EdgeDirection = EdgeDirection.Out)
+  extends StandardEdgePartitionBuilder[VD, WgtTpe](size, edgeDirection) {
+
+  override def build: EdgePartition[VD, WgtTpe] = {
+    val edgeArray = edges.trim().array
+
+    val localSrcIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val localDstIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val data = if (hasEdges) new Array[WgtTpe](edgeArray.length) else null.asInstanceOf[Array[WgtTpe]]
+
+    val global2local = new FastHashMap[VertexId, Int]
+    val local2global = new FastArray[VertexId]
+
+    val neighType = typeOf[VD]
+    val neighborBuilder = new PartitionUnTypedNeighborBuilder[VD](edgeDirection)
+
+    if (edgeArray.length > 0) {
+      var currLocalId = -1
+      var pos = 0
+      while (pos < edgeArray.length) {
+        val edge = edgeArray(pos)
+        val srcId = edge.srcId
+        val dstId = edge.dstId
+
+        val localSrcId = global2local.changeValue(srcId,
+          {
+            currLocalId += 1
+            local2global += srcId
+            currLocalId
+          }, identity)
+
+        val localDstId = global2local.changeValue(dstId,
+          {
+            currLocalId += 1
+            local2global += dstId
+            currLocalId
+          }, identity)
+
+        if (hasEdges) {
+          localSrcIds(pos) = localSrcId
+          localDstIds(pos) = localDstId
+          data(pos) = edge.attr
+        }
+
+        neighType match {
+          case tpe if tpe =:= typeOf[NeighN] =>
+            neighborBuilder.add(srcId, dstId)
+          case tpe if tpe =:= typeOf[NeighNW] =>
+            neighborBuilder.add(srcId, dstId, edge.attr)
+        }
+
+        pos += 1
+      }
+    }
+
+    val neighbors = neighborBuilder.build
+    val vertexAttrs = Array.tabulate[VD](local2global.length) { pos =>
+      val srcId = local2global(pos)
+      if (neighbors.containsKey(srcId)) {
+        neighbors(srcId)
+      } else {
+        null.asInstanceOf[VD]
+      }
+    }
+
+    val edgePartition = new EdgePartition[VD, WgtTpe](localSrcIds, localDstIds, data, null,
+      global2local, local2global.trim().array, vertexAttrs, null, None)
+
+    if (!hasEdges) {
+      edgePartition.size = edgeArray.length
+    }
+
+    edgePartition
+  }
+}
+
+class EdgePartitionWithNeighborSlotBuilder[VD: ClassTag : TypeTag, N <: UnTyped : ClassTag]
+(size: Int = 64, hasEdges: Boolean, edgeDirection: EdgeDirection = EdgeDirection.Out)
+  extends StandardEdgePartitionBuilder[VD, WgtTpe](size, edgeDirection) {
+
+  override def build: EdgePartition[VD, WgtTpe] = {
+    val edgeArray = edges.trim().array
+
+    val localSrcIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val localDstIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val data = if (hasEdges) new Array[WgtTpe](edgeArray.length) else null.asInstanceOf[Array[WgtTpe]]
+
+    val global2local = new FastHashMap[VertexId, Int]
+    val local2global = new FastArray[VertexId]
+
+    val neighType = implicitly[ClassTag[N]].runtimeClass
+    val neighborBuilder = new PartitionUnTypedNeighborBuilder[N](edgeDirection)
+
+    if (edgeArray.length > 0) {
+      var currLocalId = -1
+      var pos = 0
+      while (pos < edgeArray.length) {
+        val edge = edgeArray(pos)
+        val srcId = edge.srcId
+        val dstId = edge.dstId
+
+        val localSrcId = global2local.changeValue(srcId,
+          {
+            currLocalId += 1
+            local2global += srcId
+            currLocalId
+          }, identity)
+
+        val localDstId = global2local.changeValue(dstId,
+          {
+            currLocalId += 1
+            local2global += dstId
+            currLocalId
+          }, identity)
+
+        if (hasEdges) {
+          localSrcIds(pos) = localSrcId
+          localDstIds(pos) = localDstId
+          data(pos) = edge.attr
+        }
+
+        neighType match {
+          case tpe if tpe == classOf[NeighN] =>
+            neighborBuilder.add(srcId, dstId)
+          case tpe if tpe == classOf[NeighNW] =>
+            neighborBuilder.add(srcId, dstId, edge.attr)
+        }
+
+        pos += 1
+      }
+    }
+
+    val vertexAttrs = new Array[VD](local2global.length)
+    val edgePartition = new EdgePartition[VD, WgtTpe](localSrcIds, localDstIds, data, null,
+      global2local, local2global.trim().array, vertexAttrs, null, None)
+
+    val slot = edgePartition.getOrCreateSlot[N]("neighbor")
+    neighborBuilder.build(slot)
+
+    if (!hasEdges) {
+      edgePartition.size = edgeArray.length
+    }
+
+    edgePartition
+  }
+}
+
+class TypedEdgePartitionWithNeighborAttrBuilder[VD <: Typed : ClassTag : TypeTag]
+(size: Int = 64, hasEdges: Boolean, edgeDirection: EdgeDirection = EdgeDirection.Out)
+  extends StandardEdgePartitionBuilder[VD, Long](size, edgeDirection) {
+
+  override def build: EdgePartition[VD, Long] = {
+    val edgeArray = edges.trim().array
+    val localSrcIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val localDstIds = if (hasEdges) new Array[Int](edgeArray.length) else null.asInstanceOf[Array[Int]]
+    val data = if (hasEdges) new Array[Long](edgeArray.length) else null.asInstanceOf[Array[Long]]
+    val global2local = new FastHashMap[VertexId, Int]
+    val local2global = new FastArray[VertexId]
+
+    val neighType = typeOf[VD]
+    val neighborBuilder = new PartitionTypedNeighborBuilder[VD](edgeDirection)
+
+    if (edgeArray.length > 0) {
+      var currLocalId = -1
+      var pos = 0
+      while (pos < edgeArray.length) {
+        val edge = edgeArray(pos)
+        val srcId = edge.srcId
+        val dstId = edge.dstId
+
+        val localSrcId = global2local.changeValue(srcId,
+          {
+            currLocalId += 1
+            local2global += srcId
+            currLocalId
+          }, identity)
+
+        val localDstId = global2local.changeValue(dstId,
+          {
+            currLocalId += 1
+            local2global += dstId
+            currLocalId
+          }, identity)
+
+        if (hasEdges) {
+          localSrcIds(pos) = localSrcId
+          localDstIds(pos) = localDstId
+          data(pos) = edge.attr
+        }
+
+        val edgeAttribute = new TypedEdgeAttribute(edge.attr)
+        neighType match {
+          case tpe if tpe =:= typeOf[NeighTN] =>
+            neighborBuilder.add(srcId, edgeAttribute.srcType, dstId, edgeAttribute.dstType)
+          case tpe if tpe =:= typeOf[NeighTNW] =>
+            neighborBuilder.add(srcId, edgeAttribute.srcType, dstId, edgeAttribute.dstType, edgeAttribute.weight)
+        }
+
+        pos += 1
+      }
+    }
+
+    val neighbors = neighborBuilder.build
+    val vertexAttrs = Array.tabulate[VD](local2global.length) { pos =>
+      val srcId = local2global(pos)
+      if (neighbors.containsKey(srcId)) {
+        neighbors(srcId)
+      } else {
+        null.asInstanceOf[VD]
+      }
+    }
+
+    val edgePartition = new EdgePartition[VD, Long](localSrcIds, localDstIds, data, null,
+      global2local, local2global.trim().array, vertexAttrs, null, None)
+
+    if (!hasEdges) {
+      edgePartition.size = edgeArray.length
+    }
+
+    edgePartition
+  }
+}
+
+class ExistingEdgePartitionBuilder[VD: ClassTag : TypeTag, @spec(Long, Int, Float, Double) ED: ClassTag]
 (global2local: FastHashMap[VertexId, Int],
  local2global: Array[VertexId],
  vertexAttrs: Array[VD],

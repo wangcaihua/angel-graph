@@ -37,7 +37,14 @@ class ReflectTest extends AnyFunSuite {
     println(ReflectUtils.typeFromString(typeOf[FastHashMap[VertexId, Int]].toString))
     println(ReflectUtils.typeFromString(typeOf[FastHashMap[VertexId, Int]].toString))
 
+  }
 
-
+  test("scala.Array") {
+    val tpeStr1 = s"scala.Array[com.tencent.angel.graph.VertexId]"
+    val tpeStr2 = s"FastHashMap[Long,scala.Array[com.tencent.angel.graph.VertexId]]"
+    println(tpeStr1)
+    println(tpeStr2)
+    println(ReflectUtils.typeFromString(tpeStr1).toString)
+    println(ReflectUtils.typeFromString(tpeStr2).toString)
   }
 }

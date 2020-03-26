@@ -1,6 +1,6 @@
 package com.tencent.angel.graph.core.psf.get
 
-import com.tencent.angel.graph.utils.{GUtils, ReflectUtils, SerDe}
+import com.tencent.angel.graph.utils.{GUtils, Logging, ReflectUtils, SerDe}
 import com.tencent.angel.ml.matrix.psf.get.base.{GetResult, PartitionGetResult}
 import io.netty.buffer.ByteBuf
 import com.tencent.angel.ml.math2.vector._
@@ -9,11 +9,13 @@ import scala.reflect.runtime.universe._
 
 case class GGetResult(value: Any) extends GetResult
 
-class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int) extends PartitionGetResult {
+class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int)
+  extends PartitionGetResult with Logging {
 
   def this() = this(null, null, -1)
 
   override def serialize(byteBuf: ByteBuf): Unit = {
+    logInfo("begin to serialize GPartitionGetResult")
     SerDe.serPrimitive(tpe.toString, byteBuf)
 
     tpe match {
@@ -25,9 +27,11 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int)
     }
 
     byteBuf.writeInt(mergeFuncId)
+    logInfo("finish to serialize GPartitionGetResult")
   }
 
   override def deserialize(byteBuf: ByteBuf): Unit = {
+    logInfo("begin to deserialize GPartitionGetResult")
     val tpe = ReflectUtils.typeFromString(
       SerDe.primitiveFromBuffer[String](byteBuf)
     )
@@ -47,6 +51,7 @@ class GPartitionGetResult(var tpe: Type, var pResult: Any, var mergeFuncId: Int)
     }
 
     mergeFuncId = byteBuf.readInt()
+    logInfo("finish to deserialize GPartitionGetResult")
   }
 
   override def bufferLen(): Int = {

@@ -19,6 +19,10 @@ package object graph {
 
   val defaultWeight: WgtTpe = 0.0f
 
+  val defaultVertexType: VertexType = (-1).toShort
+
+  val defaultVertexId: VertexId = (-1).toLong
+
   def getDefaultEdgeAttr[ED: ClassTag]: ED = {
     val any = implicitly[ClassTag[ED]].runtimeClass match {
       case ed if ed == classOf[Long] => 0L
@@ -29,6 +33,7 @@ package object graph {
       case ed if ed == classOf[Char] => Char.MinValue
       case ed if ed == classOf[Byte] => 0.toByte
       case ed if ed == classOf[Short] => 0.toShort
+      case ed if ed == classOf[VertexId] => 0.toLong
     }
 
     any.asInstanceOf[ED]

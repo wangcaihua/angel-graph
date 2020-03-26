@@ -5,6 +5,7 @@ import com.tencent.angel.graph.core.data.GData
 import com.tencent.angel.ml.math2.vector.Vector
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
+import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -118,6 +119,16 @@ object GUtils {
   }
 
   def isFastMap(tpe: Type): Boolean = isIntKeyFastMap(tpe) || isLongKeyFastMap(tpe)
+
+  def isSerShortKeyMap(tpe: Type): Boolean = {
+    val t1 = tpe.typeSymbol.asClass.toType
+    val t2 = typeOf[Short2ObjectOpenHashMap[_]].typeSymbol.asClass.toType
+    if (t1 =:= t2) {
+      true
+    } else {
+      false
+    }
+  }
 
   def isSerIntKeyMap(tpe: Type): Boolean = {
     val t1 = tpe.typeSymbol.asClass.toType

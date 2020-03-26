@@ -14,6 +14,7 @@ import scala.reflect.runtime.universe._
 object PSFUtils {
   def createGet[U: ClassTag : TypeTag](getFunc: PSFGUCtx => U)
                                       (mergeFunc: PSFMCtx => U): GetPSF[U] = {
+    // PrintObject(getFunc)
     val cleanedGetFunc = CUtils.clean(getFunc)
 
     val getOp = GetOp(cleanedGetFunc)
@@ -23,6 +24,7 @@ object PSFUtils {
   }
 
   def createUpdate(updateFunc: PSFGUCtx => Unit): UpdatePSF = {
+    // PrintObject(updateFunc)
     val cleanedUpdateFunc = CUtils.clean(updateFunc)
 
     val updateOp = UpdateOp(cleanedUpdateFunc)

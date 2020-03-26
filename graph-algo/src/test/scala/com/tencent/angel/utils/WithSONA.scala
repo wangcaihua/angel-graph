@@ -15,12 +15,12 @@ trait WithSONA extends WithSpark {
     val conf = new SparkConf(false)
     conf.set("spark.ps.mode", "LOCAL")
       .set("spark.ps.jars", "None")
-      .set("spark.ps.tmp.path", "file:///tmp/stage")
-      .set("spark.ps.out.path", "file:///tmp/output")
-      .set("spark.ps.model.path", "file:///tmp/model")
+      .set("spark.ps.tmp.path", "/tmp/stage")
+      .set("spark.ps.out.path", "/tmp/output")
+      .set("spark.ps.model.path", "/tmp/model")
       .set("spark.ps.instances", "1")
       .set("spark.ps.cores", "1")
-      .set("spark.ps.out.tmp.path.prefix", "/E://temp")
+      .set("spark.ps.out.tmp.path.prefix", "/tmp")
 
     // Spark setup
     val builder = SparkSession.builder()

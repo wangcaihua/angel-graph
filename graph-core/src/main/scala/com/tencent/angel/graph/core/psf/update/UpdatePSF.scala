@@ -3,7 +3,7 @@ package com.tencent.angel.graph.core.psf.update
 import java.util.concurrent.Future
 
 import com.tencent.angel.graph.VertexId
-import com.tencent.angel.graph.utils.{FastHashMap, GUtils, ReflectUtils}
+import com.tencent.angel.graph.utils.{FastHashMap, GUtils}
 import com.tencent.angel.ml.matrix.psf.update.base.VoidResult
 import com.tencent.angel.psagent.matrix.MatrixClient
 
@@ -27,51 +27,56 @@ class UpdatePSF(updateOp: UpdateOp) extends Serializable {
     this
   }
 
-  def apply[T: TypeTag](getParam: T, batchSize: Int): Unit = {
-    getParam match {
-      case gParam: Array[VertexId] =>
-        val size = gParam.length
-        if (size <= batchSize) {
-          this.apply(getParam)
-        } else {
-          var (start, end) = (0, batchSize)
+  def apply[T: TypeTag](updateParam: T, batchSize: Int): Unit = {
+    if (batchSize <= 0) {
+      async[T](updateParam).get
+    } else {
+      updateParam match {
+        case gParam: Array[VertexId] =>
+          val size = gParam.length
+          if (size <= batchSize) {
+            this.apply(updateParam)
+          } else {
+            var (start, end) = (0, batchSize)
 
-          while (end < size + batchSize) {
-            val thisEnd = if (end < size) end else size
-            val len = thisEnd - start
-            val batchGParam = new Array[VertexId](len)
-            Array.copy(gParam, start, batchGParam, 0, len)
+            while (end < size + batchSize) {
+              val thisEnd = if (end < size) end else size
+              val len = thisEnd - start
+              val batchGParam = new Array[VertexId](len)
+              Array.copy(gParam, start, batchGParam, 0, len)
 
-            this.apply(batchGParam.asInstanceOf[T])
-
-            start = end
-            end += batchSize
-          }
-        }
-      case gParam: FastHashMap[_, _] =>
-        val size = gParam.size()
-        if (size <= batchSize) {
-          this.apply(getParam)
-        } else {
-          val iter = gParam.iterator
-          var curr = 0
-          val batchGParam = gParam.emptyLike(batchSize)
-          while (iter.hasNext) {
-            curr += 1
-            val (key, value) = iter.next()
-            batchGParam.put(key, value)
-
-            if (curr == size) {
               this.apply(batchGParam.asInstanceOf[T])
-            } else if (curr % batchSize == 0) {
-              this.apply(batchGParam.asInstanceOf[T])
-              batchGParam.clear()
+
+              start = end
+              end += batchSize
             }
           }
-        }
-      case _ =>
-        throw new Exception("cannot execute batch!")
+        case gParam: FastHashMap[_, _] =>
+          val size = gParam.size()
+          if (size <= batchSize) {
+            this.apply(updateParam)
+          } else {
+            val iter = gParam.iterator
+            var curr = 0
+            val batchGParam = gParam.emptyLike(batchSize)
+            while (iter.hasNext) {
+              curr += 1
+              val (key, value) = iter.next()
+              batchGParam.put(key, value)
+
+              if (curr == size) {
+                this.apply(batchGParam.asInstanceOf[T])
+              } else if (curr % batchSize == 0) {
+                this.apply(batchGParam.asInstanceOf[T])
+                batchGParam.clear()
+              }
+            }
+          }
+        case _ =>
+          throw new Exception("cannot execute batch!")
+      }
     }
+
   }
 
   def apply[T: TypeTag](updateParam: T): Unit = async[T](updateParam).get

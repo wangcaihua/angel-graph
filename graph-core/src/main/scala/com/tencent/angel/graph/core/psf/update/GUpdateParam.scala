@@ -6,7 +6,7 @@ import com.tencent.angel.PartitionKey
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.psf.common.{NonSplitter, RangeSplitter, Singular, Splitter}
 import com.tencent.angel.graph.core.psf.utils.ParamSerDe
-import com.tencent.angel.graph.utils.{GUtils, SerDe}
+import com.tencent.angel.graph.utils.{GUtils, Logging, SerDe}
 import com.tencent.angel.ml.matrix.psf.update.base.{PartitionUpdateParam, UpdateParam}
 import com.tencent.angel.psagent.PSAgentContext
 import io.netty.buffer.ByteBuf
@@ -14,11 +14,12 @@ import io.netty.buffer.ByteBuf
 import scala.reflect.runtime.universe._
 
 class GUpdateParam[T: TypeTag](mId: Int, uClock: Boolean, params: T, operation: Int)
-  extends UpdateParam(mId, uClock) {
+  extends UpdateParam(mId, uClock) with Logging {
 
   private val tpe = typeOf[T]
 
   override def split(): util.List[PartitionUpdateParam] = {
+    logInfo("split parameter in GUpdateParam")
     val parts: util.List[PartitionKey] = PSAgentContext.get.getMatrixMetaManager
       .getPartitions(matrixId)
 
@@ -88,25 +89,31 @@ object GUpdateParam {
 
 class GPartitionUpdateParam(mId: Int, part: PartitionKey, uClock: Boolean,
                             splitter: Splitter, var tpe: Type, var params: Any, var operation: Any)
-  extends PartitionUpdateParam(mId, part, uClock) {
+  extends PartitionUpdateParam(mId, part, uClock) with Logging {
 
   def this() = this(0, null, false, null, null, null, null)
 
   override def serialize(buf: ByteBuf): Unit = {
+    logInfo("begin to serialize GPartitionUpdateParam")
     super.serialize(buf)
     ParamSerDe.serializeSplit(splitter, tpe, params, buf)
 
+    logInfo("serialize UpdateOp")
     val dataObj = UpdateOp.get(operation.asInstanceOf[Int])
     buf.writeInt(dataObj.length).writeBytes(dataObj)
+    logInfo("finish to serialize GPartitionUpdateParam")
   }
 
   override def deserialize(buf: ByteBuf): Unit = {
+    logInfo("begin to deserialize GPartitionUpdateParam")
     super.deserialize(buf)
     val (t, p) = ParamSerDe.deserializeSplit(buf)
 
     tpe = t
     params = p
+    logInfo("deserialize UpdateOp")
     operation = SerDe.javaDeserialize[UpdateOp](buf)
+    logInfo("finish to deserialize GPartitionUpdateParam")
   }
 
   override def bufferLen(): Int = {

@@ -50,7 +50,7 @@ object PageRank extends Logging with Serializable {
 
     def vprog(vd: Float, m: Float): Float = resetProb * vd + (1 - resetProb) * m
 
-    def active(vd: Float, m: Float): Boolean = Math.abs((1 - resetProb) * (m - vd)) < 1e-6
+    def active(vd: Float, m: Float): Boolean = Math.abs((1 - resetProb) * (m - vd)) >= 1e-6
 
     Pregel(graph, initialMsg = 0.0f, maxIterations = numIter,
       batchSize = batchSize, activeDirection = activeDirection)(

@@ -1,8 +1,6 @@
 package com.tencent.angel.graph.utils
 
 import scala.reflect.ClassTag
-import scala.{specialized => spec}
-import com.google.common.hash.Hashing
 
 
 class FastArray[@specialized V: ClassTag](initialSize: Int = 64) {
@@ -32,9 +30,45 @@ class FastArray[@specialized V: ClassTag](initialSize: Int = 64) {
 
   def size: Int = _numElements
 
+  def head: V = {
+    require(_numElements >= 0)
+    _array(0)
+  }
+
+  def head(k: Int): Array[V] = {
+    require(k <= _numElements)
+
+    val res = new Array[V](k)
+    Array.copy(_array, 0, res, 0, k)
+
+    res
+  }
+
+  def last: V = {
+    require(_numElements - 1 >= 0)
+    _array(_numElements - 1)
+  }
+
+  def last(k: Int): Array[V] = {
+    val start = _numElements - k
+    require(start >= 0)
+
+    val res = new Array[V](k)
+    Array.copy(_array, start, res, 0, k)
+
+    res
+  }
+
+  def clear: this.type = {
+    _numElements = 0
+    this
+  }
+
   def iterator: Iterator[V] = new Iterator[V] {
     var index = 0
+
     override def hasNext: Boolean = index < _numElements
+
     override def next(): V = {
       if (!hasNext) {
         throw new NoSuchElementException

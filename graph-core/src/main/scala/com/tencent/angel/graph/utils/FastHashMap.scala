@@ -81,6 +81,10 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag](expected: Int
 
   def size(): Int = numElements
 
+  def isEmpty: Boolean = numElements == 0
+
+  def nonEmpty: Boolean = numElements > 0
+
   private def realSize: Int = if (containsNullKey) numElements - 1 else numElements
 
   private def getPos(key: K): Int = {
@@ -336,6 +340,15 @@ class FastHashMap[@spec(Int, Long) K: ClassTag, @spec V: ClassTag](expected: Int
     }
 
     this
+  }
+
+  def map[@spec U: ClassTag](func: (K, V) => U): FastHashMap[K, U] = {
+    val res = new FastHashMap[K, U](numElements)
+    iterator.foreach{ case (key, value) =>
+      res.put(key, func(key, value))
+    }
+
+    res
   }
 
   def foreach(func: (K, V) => Unit): Unit = {

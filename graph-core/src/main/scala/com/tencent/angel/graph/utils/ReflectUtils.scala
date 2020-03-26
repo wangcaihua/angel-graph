@@ -2,6 +2,7 @@ package com.tencent.angel.graph.utils
 
 import com.tencent.angel.graph.VertexId
 import com.tencent.angel.graph.core.data._
+import com.tencent.angel.graph.core.psf.common.Singular
 import com.tencent.angel.ml.math2.vector._
 import it.unimi.dsi.fastutil.ints._
 import it.unimi.dsi.fastutil.longs._
@@ -14,17 +15,18 @@ import scala.tools.reflect.ToolBox
 
 
 object ReflectUtils {
-  private val mirror = runtimeMirror(ReflectUtils.getClass.getClassLoader)
-  private val tb = mirror.mkToolBox()
-
   private val Atomic = "([\\w.]+)".r
-  private val ArrayType = "Array\\[([\\w.]+)]".r
+  private val ArrayType = "(?:scala.Array|Array)\\[([\\w.]+)]".r
   private val FastMap = "([\\w.]+)\\[([\\w.]+),([\\w.]+)]".r
-  private val FastMapArray = "([\\w.]+)\\[([\\w.]+),Array\\[([\\w.]+)]]".r
+  private val FastMapArray = "([\\w.]+)\\[([\\w.]+),(?:scala.Array|Array)\\[([\\w.]+)]]".r
   private val UnimiMap = "([\\w.]+)\\[([\\w.]+)]".r
-  private val UnimiMapArray = "([\\w.]+)\\[Array[([\\w.]+)]]".r
+  private val UnimiMapArray = "([\\w.]+)\\[(?:scala.Array|Array)[([\\w.]+)]]".r
 
   private val ObjCache = new mutable.HashMap[String, Any]()
+  private val tpeCache = new mutable.HashMap[String, Type]()
+
+  private lazy val mirror = runtimeMirror(ReflectUtils.getClass.getClassLoader)
+  private lazy val tb = mirror.mkToolBox()
 
   def newInstance(tpe: Type): Any = {
     val constructor = getMethod(tpe: Type, termNames.CONSTRUCTOR)
@@ -230,6 +232,7 @@ object ReflectUtils {
             case "NeighNW" => typeOf[NeighNW]
             case "NeighTN" => typeOf[NeighTN]
             case "NeighTNW" => typeOf[NeighTNW]
+            case "Singular" => typeOf[Singular]
           }
         case ArrayType(t) =>
           t.split("\\.").last match {
@@ -528,6 +531,9 @@ object ReflectUtils {
                 case "String" =>
                   ObjCache(tpeStr) = new FastHashMap[Int, Array[String]]
                   typeOf[FastHashMap[Int, Array[String]]]
+                case "VertexId" =>
+                  ObjCache(tpeStr) = new FastHashMap[Int, Array[VertexId]]
+                  typeOf[FastHashMap[Int, Array[VertexId]]]
                 case "IntDummyVector" =>
                   ObjCache(tpeStr) = new FastHashMap[Int, Array[IntDummyVector]]
                   typeOf[FastHashMap[Int, Array[IntDummyVector]]]
@@ -597,6 +603,9 @@ object ReflectUtils {
                 case "Double" =>
                   ObjCache(tpeStr) = new FastHashMap[Long, Array[Double]]
                   typeOf[FastHashMap[Long, Array[Double]]]
+                case "VertexId" =>
+                  ObjCache(tpeStr) = new FastHashMap[Long, Array[VertexId]]
+                  typeOf[FastHashMap[Long, Array[VertexId]]]
                 case "String" =>
                   ObjCache(tpeStr) = new FastHashMap[Long, Array[String]]
                   typeOf[FastHashMap[Long, Array[String]]]
@@ -672,6 +681,9 @@ object ReflectUtils {
                 case "String" =>
                   ObjCache(tpeStr) = new FastHashMap[VertexId, Array[String]]
                   typeOf[FastHashMap[VertexId, Array[String]]]
+                case "VertexId" =>
+                  ObjCache(tpeStr) = new FastHashMap[VertexId, Array[VertexId]]
+                  typeOf[FastHashMap[VertexId, Array[VertexId]]]
                 case "IntDummyVector" =>
                   ObjCache(tpeStr) = new FastHashMap[VertexId, Array[IntDummyVector]]
                   typeOf[FastHashMap[VertexId, Array[IntDummyVector]]]
@@ -795,12 +807,17 @@ object ReflectUtils {
       }
     } catch {
       case _: Exception =>
-        val tree = tb.parse(s"scala.reflect.runtime.universe.typeOf[$tpeStr] -> new $tpeStr")
-        val tpe_Obj = tb.eval(tree).asInstanceOf[(Type, Any)]
-        val tpe = tpe_Obj._1
-        ObjCache(tpeStr) = tpe_Obj._2
+        if (tpeCache.contains(tpeStr)) {
+          tpeCache(tpeStr)
+        } else {
+          val tree = tb.parse(s"scala.reflect.runtime.universe.typeOf[$tpeStr] -> new $tpeStr()")
+          val tpe_Obj = tb.eval(tree).asInstanceOf[(Type, Any)]
+          val tpe = tpe_Obj._1
+          tpeCache(tpeStr) = tpe_Obj._1
+          ObjCache(tpeStr) = tpe_Obj._2
 
-        tpe
+          tpe
+        }
     }
   }
 }

@@ -12,6 +12,7 @@
         <module>graph-core</module>
         <module>graph-algo</module>
         <module>graph-examples</module>
+        <module>dist</module>
     </modules>
 
     <properties>

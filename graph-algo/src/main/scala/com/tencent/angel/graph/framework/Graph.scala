@@ -17,9 +17,11 @@ import org.apache.spark.{HashPartitioner, SparkContext}
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
+import scala.{specialized => spec}
+import scala.language.implicitConversions
 
 
-class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
+class Graph[VD: ClassTag : TypeTag, @spec(Int, Long, Float, Double) ED: ClassTag : TypeTag](val psVertices: PSMatrix,
                                                   val edges: RDD[EdgePartition[VD, ED]])
   extends Serializable with Logging {
 
@@ -28,8 +30,9 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
   edges.cache()
   edges.foreachPartition { iter => iter.next().setPSMatrix(psVertices) }
 
-  @transient private lazy val sparkContext: SparkContext = edges.sparkContext
-  @transient private lazy val matrixMetaManager: PSAgentMatrixMetaManager = PSAgentContext.get.getMatrixMetaManager
+  @transient lazy val sparkContext: SparkContext = edges.sparkContext
+
+  @transient lazy val matrixMetaManager: PSAgentMatrixMetaManager = PSAgentContext.get.getMatrixMetaManager
 
   @transient lazy val maxVertexId: VertexId = edges.mapPartitions { iter =>
     val part = iter.next()
@@ -186,7 +189,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
   }
 
   // mapVertices on vertices will create new Graph, so it's inefficient
-  def mapVertices[VD2: ClassTag : TypeTag](map: VD => VD2): Graph[VD2, ED] = {
+  def mapVertices[VD2: ClassTag : TypeTag](map: (VertexId, VD) => VD2): Graph[VD2, ED] = {
     val oldMatrixId = psVertices.id
     val meta = PSAgentContext.get.getMatrixMetaManager.getMatrixMeta(oldMatrixId)
     val matrixContext = meta.getMatrixContext
@@ -204,7 +207,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
       val newPartition = oldPartition.withAttrType[VD2]
 
       oldPartition.local2global.foreach { vid =>
-        newPartition.setAttr(vid, map(oldPartition.getAttr(vid)))
+        newPartition.setAttr(vid, map(vid, oldPartition.getAttr(vid)))
       }
 
       PSPartition.set[VD2](thisKey, newPartition)
@@ -224,7 +227,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
   }
 
   // operations on edge, note those ops will create new Graph, so it's inefficient
-  def mapEdges[ED2: ClassTag](map: Edge[ED] => ED2): Graph[VD, ED2] = {
+  def mapEdges[ED2: ClassTag: TypeTag](map: Edge[ED] => ED2): Graph[VD, ED2] = {
     val newEdge = edges.mapPartitions { iter =>
       val edgePartition = iter.next()
       val edgeIterator = edgePartition.iterator
@@ -237,7 +240,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
     new Graph[VD, ED2](psVertices, newEdge)
   }
 
-  def mapTriplets[ED2: ClassTag](map: EdgeTriplet[VD, ED] => ED2): Graph[VD, ED2] = {
+  def mapTriplets[ED2: ClassTag: TypeTag](map: EdgeTriplet[VD, ED] => ED2): Graph[VD, ED2] = {
     val newEdge = edges.mapPartitions { iter =>
       val edgePartition = iter.next()
       val tripletIterator = edgePartition.tripletIterator()
@@ -264,7 +267,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
   def subgraph(vpred: (VertexId, VD) => Boolean, epred: EdgeTriplet[VD, ED] => Boolean): Graph[VD, ED] = {
     val newEdges = edges.mapPartitions { iter =>
       val edgePartition = iter.next()
-      val builder = new EdgePartitionBuilder[VD, ED](edgePartition.size)
+      val builder = new StandardEdgePartitionBuilder[VD, ED](edgePartition.size)
 
       val tripletIterator = edgePartition.tripletIterator()
       val newVerticesAttrs = new FastHashMap[VertexId, VD]()
@@ -381,6 +384,65 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
     }
   }
 
+  def calValues(slotName: String, direction: EdgeDirection = EdgeDirection.Both): Unit = {
+    edges.foreachPartition { iter =>
+      val edgePartition = iter.next()
+
+      val localValues = new FastHashMap[VertexId, Double]()
+      direction match {
+        case EdgeDirection.Out =>
+          edgePartition.iterator.foreach { edge =>
+            localValues.putMerge(edge.srcId, edge.attr.asInstanceOf[Double], (v1, v2) => v1 + v2)
+          }
+        case EdgeDirection.In =>
+          edgePartition.iterator.foreach { edge =>
+            localValues.putMerge(edge.dstId, edge.attr.asInstanceOf[Double], (v1, v2) => v1 + v2)
+          }
+        case EdgeDirection.Both =>
+          edgePartition.iterator.foreach { edge =>
+            localValues.putMerge(edge.srcId, edge.attr.asInstanceOf[Double], (v1, v2) => v1 + v2)
+            localValues.putMerge(edge.dstId, edge.attr.asInstanceOf[Double], (v1, v2) => v1 + v2)
+          }
+        case _ =>
+          throw new Exception("direction error")
+      }
+
+
+      val pushDegree = psVertices.createUpdate { ctx: PSFGUCtx =>
+        val params = ctx.getMapParam[Double]
+        val partition = ctx.getPartition[VD]
+        val degree = partition.getOrCreateSlot[Double](slotName)
+
+        params.foreach { case (k, v) =>
+          degree.putMerge(k, v, (v1: Double, v2: Double) => v1 + v2)
+        }
+      }
+
+      pushDegree(localValues)
+      pushDegree.clear()
+    }
+  }
+
+  def updateVertexAttr(degreeSlotName: String, valueSlotName: String, vprog: (VD, Int, Double, Double) => VD,
+                       defaultMsg: Int, defaultU: Double): this.type = {
+
+    val update = psVertices.createUpdate { ctx: PSFGUCtx =>
+      val partition = ctx.getPartition[VD]
+      val degree = partition.getOrCreateSlot[Int](degreeSlotName).asFastHashMap
+      val values = partition.getOrCreateSlot[Double](valueSlotName).asFastHashMap
+
+      degree.foreach { case (vid, count) =>
+        val v3 = values.get(vid) * 1.0 / count - defaultU
+        val v4 = 1.0 / scala.math.sqrt(count)
+
+        partition.setAttr(vid, vprog(partition.getAttr(vid), defaultMsg, v3, v4))
+      }
+    }
+    update()
+    update.clear()
+    this
+  }
+
   def activeMessageCount(): Int = {
     val activeMessageCountPSF = psVertices.createGet { ctx: PSFGUCtx =>
       ctx.getPartition[VD].activeVerticesCount()
@@ -405,7 +467,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
       }
     }.partitionBy(new HashPartitioner(numPartitions))
       .mapPartitions { iter =>
-        val builder = new EdgePartitionBuilder[VD, ED]()
+        val builder = new StandardEdgePartitionBuilder[VD, ED]()
         iter.foreach { case (_, (srcId, dstId, attr)) =>
           builder.add(srcId, dstId, attr)
         }
@@ -468,7 +530,7 @@ class Graph[VD: ClassTag : TypeTag, ED: ClassTag](val psVertices: PSMatrix,
 }
 
 object Graph extends Logging {
-  private[Graph] def nextPSMatrixName: String = s"PSPartition_${UUID.randomUUID()}"
+  private def nextPSMatrixName: String = s"PSPartition_${UUID.randomUUID()}"
 
   implicit def toGraphOps[VD: ClassTag : TypeTag, ED: ClassTag](graph: Graph[VD, ED]): GraphOps[VD, ED] = {
     new GraphOps(graph)
@@ -540,5 +602,11 @@ object Graph extends Logging {
     logInfo("Finished to create PSMatrix")
 
     psMatrix
+  }
+
+  def apply[VD: ClassTag : TypeTag, ED: ClassTag: TypeTag](edges: RDD[EdgePartition[VD, ED]]): Graph[VD, ED] = {
+    val psVertices = createPSVertices(edges)
+
+    new Graph[VD, ED](psVertices, edges)
   }
 }

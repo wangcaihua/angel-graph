@@ -3,6 +3,7 @@ package com.tencent.angel.graph.core.psf.get
 import java.util
 
 import com.tencent.angel.graph.core.psf.common.{PSFGUCtx, PSFMCtx}
+import com.tencent.angel.graph.utils.ReflectUtils
 import com.tencent.angel.ml.matrix.psf.get.base._
 import com.tencent.angel.ps.storage.vector.ServerRow
 
@@ -40,7 +41,8 @@ class GGetFunc(gParam: GetParam) extends GetFunc(gParam) {
     row.startRead()
     try {
       val pgParam = PSFGUCtx(psContext, pp.getMatrixId, pp.getPartKey.getPartitionId, pp.tpe, pp.params)
-      val (tpe, pGet) = doGet(pgParam)
+      val pGet = doGet(pgParam)
+      val tpe = ReflectUtils.typeFromString(doGet.typeString)
       new GPartitionGetResult(tpe, pGet, pp.mergeFunc.asInstanceOf[Int])
     } finally {
       row.endRead()
